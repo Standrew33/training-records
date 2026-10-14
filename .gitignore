@@ -1,4 +1,8 @@
-node_modules
-dist
-# Surové exporty obsahují rodná čísla – do repozitáře nepatří. Do aplikace jde jen vyčištěný dataset.json.
-data-raw
+bin/
+obj/
+out/
+.vs/
+*.user
+# Surové exporty obsahují rodná čísla – do repozitáře nepatří.
+# Do aplikace jde jen vyčištěný src/Skoleni.Web/wwwroot/data/dataset.json (bez rodných čísel a poznámek).
+data-raw/

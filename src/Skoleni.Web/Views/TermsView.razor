@@ -1,0 +1,39 @@
+@implements IDisposable
+@inject AppState State
+
+<section class="card">
+    <h2>Vypsané termíny</h2>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>Termín</th><th>Školení</th><th>Datum a místo</th><th>Kapacita</th><th>Cena</th><th>Poznámky</th></tr></thead>
+            <tbody>
+            @foreach (var t in State.Data.Terms)
+            {
+                var past = t.Date < State.AsOf;
+                var added = State.Plan.ForTerm(t.Id).Count();
+                var notes = new List<string>();
+                if (t.ExcludedReason is not null) notes.Add($"nepoužitelný: {t.ExcludedReason}");
+                else if (past) notes.Add("proběhl před zvoleným datem");
+                if (t.Weekend) notes.Add("víkend");
+                if (t.Booked > t.Capacity) notes.Add("přeplněno");
+                if (t.PriceEstimated) notes.Add("cena odhadnuta");
+                <tr class="@(t.ExcludedReason is not null || past ? "dim" : "")">
+                    <td>@t.Id</td>
+                    <td>@(State.CourseByCode.TryGetValue(t.CourseCode, out var c) ? c.Name : t.CourseCode)</td>
+                    <td>@Format.Date(t.Date) @t.Start:HH\:mm–@t.End:HH\:mm<div class="muted">@t.Place</div></td>
+                    <td>@t.Booked/@t.Capacity
+                        @if (t.Usable && !past) { <div class="muted">volno @t.FreeSeats@(added > 0 ? $", plán +{added}" : "")</div> }</td>
+                    <td>@(t.Price is { } p ? Format.Kc(p) : "–")</td>
+                    <td>@foreach (var n in notes) { <span class="tag">@n</span> }</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    protected override void OnInitialized() => State.Changed += OnChanged;
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => State.Changed -= OnChanged;
+}

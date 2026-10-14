@@ -1,0 +1,45 @@
+@inject AppState State
+
+@{
+    var issues = State.Data.Issues;
+    var shown = issues.Where(i => (severity is null || i.Severity == severity) && (source == "" || i.Source == source)).ToList();
+}
+
+<section class="card">
+    <h2>Kvalita vstupních dat</h2>
+    <p class="muted">
+        Co jsme ve čtyřech exportech našli a jak s tím aplikace naložila. Nic se neopravuje ani nevyřazuje mlčky.
+        <b>Chyba</b> = problém, který změnil výsledky (např. vyřazený záznam); <b>varování</b> = úprava nebo podezření, které by měl někdo ověřit;
+        <b>info</b> = kosmetika (formát data, velikost písmen).
+    </p>
+    <div class="kpis small">
+        @foreach (var s in new[] { IssueSeverity.Error, IssueSeverity.Warning, IssueSeverity.Info })
+        {
+            <button class="kpi click @(severity == s ? "sel" : "")" @onclick="() => severity = severity == s ? null : s">
+                <div class="n">@issues.Count(i => i.Severity == s)</div>@Format.Label(s)</button>
+        }
+    </div>
+    <div class="filters">
+        <select value="@source" @onchange="e => source = e.Value?.ToString() ?? string.Empty" aria-label="Zdroj">
+            <option value="">Všechny zdroje</option>
+            @foreach (var s in issues.Select(i => i.Source).Distinct()) { <option>@s</option> }
+        </select>
+        <span class="muted">@shown.Count záznamů</span>
+    </div>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>Zdroj</th><th>Typ</th><th>Odkaz</th><th>Problém</th><th>Řešení</th></tr></thead>
+            <tbody>
+            @foreach (var i in shown)
+            {
+                <tr><td>@i.Source</td><td><span class="tag sev-@i.Severity">@Format.Label(i.Severity)</span></td><td>@i.Ref</td><td>@i.Description</td><td>@i.Resolution</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private IssueSeverity? severity;
+    private string source = "";
+}

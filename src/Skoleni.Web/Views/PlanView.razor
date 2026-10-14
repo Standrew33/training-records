@@ -1,0 +1,98 @@
+@implements IDisposable
+@inject AppState State
+
+@{
+    var plan = State.Plan;
+    var coursesByCode = State.CourseByCode;
+    var terms = State.Data.Terms.Where(t => t.Usable && t.Date >= State.AsOf && plan.ForTerm(t.Id).Any() && (course == "" || t.CourseCode == course)).ToList();
+    string csvHref = CsvWriter.ToDataUri(CsvWriter.Write(
+        ["Termín", "Datum", "Čas", "Místo", "Školení", "Zaměstnanec", "ID", "Útvar", "Nadřízený", "Důvod", "Platnost do", "Pozn."],
+        plan.Assignments.OrderBy(a => a.Term.Date).ThenBy(a => a.Requirement.Employee.LastName, StringComparer.CurrentCulture).Select(a => new string?[]
+        {
+            a.Term.Id, a.Term.Date?.ToString("yyyy-MM-dd"), $"{a.Term.Start:HH\\:mm}-{a.Term.End:HH\\:mm}", a.Term.Place, coursesByCode[a.Term.CourseCode].Name,
+            a.Requirement.Employee.FullName, a.Requirement.Employee.Id, a.Requirement.Employee.Department, State.ManagerName(a.Requirement.Employee),
+            Format.Label(a.Requirement.Status), a.Requirement.ValidUntil?.ToString("yyyy-MM-dd"), a.WillLapse ? "termín je po expiraci" : "",
+        })));
+}
+
+<section class="card">
+    <h2>Doporučené přihlášení na termíny</h2>
+    <p class="muted">
+        Postup: nejdřív ti, komu školení už vypršelo nebo chybí, pak ti, komu platnost končí nejdřív. Každému se vybere nejbližší termín s volným místem,
+        který stihne lhůtu (jinak nejbližší možný). Respektuje se kapacita (kapacita − obsazeno), kolize téhož člověka a datum ukončení poměru.
+        Rodičovská a ukončení se neplánují. Aplikace <b>neví, kdo už je na „obsazených“ místech přihlášen</b> – před odesláním to ověřte.
+    </p>
+    <div class="kpis small">
+        <div class="kpi"><div class="n">@plan.Assignments.Count</div>navržených přihlášek</div>
+        <div class="kpi"><div class="n">@Format.Kc(plan.EstimatedCost)</div>odhad nákladů</div>
+        <div class="kpi @(plan.Assignments.Any(a => a.WillLapse) ? "warn" : "")"><div class="n">@plan.Assignments.Count(a => a.WillLapse)</div>propadne před termínem</div>
+        <div class="kpi @(plan.Unassigned.Count > 0 ? "warn" : "")"><div class="n">@plan.Unassigned.Count</div>bez termínu</div>
+    </div>
+    <table>
+        <thead><tr><th>Školení</th><th>Potřebuje</th><th>Volných míst</th><th>Nepokryto</th></tr></thead>
+        <tbody>
+        @foreach (var c in plan.Coverage)
+        {
+            <tr><td>@coursesByCode[c.CourseCode].Name</td><td>@c.Needed</td><td>@c.FreeSeats</td>
+                <td>@if (c.Shortfall > 0) { <span class="badge bad">@c.Shortfall – vypsat termín</span> } else { <text>0</text> }</td></tr>
+        }
+        </tbody>
+    </table>
+    <div class="filters">
+        <select value="@course" @onchange="e => course = e.Value?.ToString() ?? string.Empty" aria-label="Školení">
+            <option value="">Všechna školení</option>
+            @foreach (var c in plan.Coverage) { <option value="@c.CourseCode">@coursesByCode[c.CourseCode].Name</option> }
+        </select>
+        <a class="btn" download="plan-prihlaseni.csv" href="@csvHref">Export plánu (CSV)</a>
+    </div>
+</section>
+
+@foreach (var t in terms)
+{
+    var assigned = plan.ForTerm(t.Id).ToList();
+    <section class="card term">
+        <h3>@coursesByCode[t.CourseCode].Name · @Format.Date(t.Date) @t.Start:HH\:mm–@t.End:HH\:mm · @t.Place
+            @if (t.Weekend) { <span class="tag warn"> víkend</span> }</h3>
+        <p class="muted">@t.Id · kapacita @t.Capacity, obsazeno @t.Booked, volných @t.FreeSeats → navrženo @assigned.Count, zbývá @(t.FreeSeats - assigned.Count)
+            @if (t.Price is { } p) { <text> · @Format.Kc(p)/os@(t.PriceEstimated ? " (odhad)" : "")</text> }</p>
+        <div class="meter">
+            <div class="fill" style="width:@Pct(t.Booked + assigned.Count, t.Capacity)"></div>
+            <div class="base" style="width:@Pct(t.Booked, t.Capacity)"></div>
+        </div>
+        <ul class="people">
+            @foreach (var a in assigned)
+            {
+                <li><b>@a.Requirement.Employee.FullName</b> <small class="muted">@a.Requirement.Employee.Department</small> <Badge Status="a.Requirement.Status" />
+                    @if (a.Requirement.ValidUntil is { } v && a.Requirement.Status != TrainingStatus.Missing)
+                    {
+                        <small class="muted"> platnost @(a.Requirement.Status == TrainingStatus.Expired ? "skončila" : "končí") @Format.Date(v)</small>
+                    }
+                    @if (a.WillLapse) { <span class="tag warn"> termín je až po expiraci</span> }</li>
+            }
+        </ul>
+    </section>
+}
+
+@if (plan.Unassigned.Count > 0)
+{
+    <section class="card">
+        <h2>Bez přiděleného termínu (@plan.Unassigned.Count)</h2>
+        <ul class="people">
+            @foreach (var u in plan.Unassigned)
+            {
+                <li><b>@u.Requirement.Employee.FullName</b> – @u.Requirement.Course.Name <Badge Status="u.Requirement.Status" /> <small class="muted">@u.Reason</small></li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    private string course = "";
+
+    private static string Pct(int n, int capacity) =>
+        FormattableString.Invariant($"{Math.Min(100.0, capacity == 0 ? 0 : 100.0 * n / capacity):0.#}%");
+
+    protected override void OnInitialized() => State.Changed += OnChanged;
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => State.Changed -= OnChanged;
+}

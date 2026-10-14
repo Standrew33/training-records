@@ -1,0 +1,19 @@
+<div class="stack" role="img" aria-label="Platné @Counts.Valid, brzy vyprší @Counts.ExpiringSoon, prošlé @Counts.Expired, chybí @Counts.Missing">
+    @Seg("ok", Counts.Valid, "Platné")
+    @Seg("soon", Counts.ExpiringSoon, "Brzy vyprší")
+    @Seg("bad", Counts.Expired, "Prošlé")
+    @Seg("miss", Counts.Missing, "Chybí")
+</div>
+
+@code {
+    [Parameter, EditorRequired] public StatusCounts Counts { get; set; } = null!;
+
+    private RenderFragment Seg(string css, int n, string label) => n == 0 ? b => { } : b =>
+    {
+        b.OpenElement(0, "div");
+        b.AddAttribute(1, "class", $"seg {css}");
+        b.AddAttribute(2, "style", FormattableString.Invariant($"width:{(double)n / Counts.Total * 100:0.##}%"));
+        b.AddAttribute(3, "title", $"{label}: {n}");
+        b.CloseElement();
+    };
+}

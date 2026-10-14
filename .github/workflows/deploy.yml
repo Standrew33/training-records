@@ -1,36 +1,47 @@
-name: Deploy to GitHub Pages
+name: Test and deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: pages
   cancel-in-progress: true
+
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-dotnet@v4
         with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+          dotnet-version: 9.0.x
+      - run: dotnet test Skoleni.sln --configuration Release
+
   deploy:
-    needs: build
+    needs: test
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - run: dotnet publish src/Skoleni.Web -c Release -o out
+      # Pages běží pod /<název-repozitáře>/, takže se musí přepsat <base href>
+      - run: sed -i "s|<base href=\"/\" />|<base href=\"/${{ github.event.repository.name }}/\" />|" out/wwwroot/index.html
+      - run: touch out/wwwroot/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out/wwwroot
       - id: deployment
         uses: actions/deploy-pages@v4

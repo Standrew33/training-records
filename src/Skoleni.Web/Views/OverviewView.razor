@@ -1,0 +1,104 @@
+@implements IDisposable
+@inject AppState State
+
+@{
+    var counted = Statistics.Counted(State.Requirements, State.AsOf).ToList();
+    var total = StatusCounts.Of(counted);
+    var people = State.Data.Employees.Where(e => Compliance.GroupOf(e, State.AsOf) is EmployeeGroup.Active or EmployeeGroup.Starting).ToList();
+    var peopleWithProblem = counted.Where(r => r.NeedsAction).Select(r => r.Employee.Id).Distinct().Count();
+    var plan = State.Plan;
+    var lapsing = plan.Assignments.Where(a => a.WillLapse).ToList();
+    var shortages = plan.Coverage.Where(c => c.Shortfall > 0).ToList();
+    var onLeave = State.Data.Employees.Count(e => Compliance.GroupOf(e, State.AsOf) == EmployeeGroup.ParentalLeave);
+    var excludedTerms = State.Data.Terms.Where(t => t.ExcludedReason is not null).ToList();
+    var departments = people.Select(e => e.Department).Distinct().Order().ToList();
+}
+
+<section class="kpis">
+    <div class="kpi"><div class="n">@Format.Pct(total.OkShare)</div><div>povinných školení v pořádku</div><small>@total.Total povinností u @people.Count lidí</small></div>
+    <button class="kpi click" @onclick="@(() => State.Go(Tab.People, new PeopleFilter { Status = "problem" }))">
+        <div class="n bad">@total.Problems</div><div>prošlých nebo chybějících</div><small>@total.Expired prošlých, @total.Missing chybí</small></button>
+    <button class="kpi click" @onclick="@(() => State.Go(Tab.People, new PeopleFilter { Status = nameof(TrainingStatus.ExpiringSoon) }))">
+        <div class="n soon">@total.ExpiringSoon</div><div>vyprší do @State.SoonDays dní</div><small>do @Format.Date(State.AsOf.AddDays(State.SoonDays))</small></button>
+    <button class="kpi click" @onclick="@(() => State.Go(Tab.People))">
+        <div class="n">@peopleWithProblem</div><div>lidí s alespoň jedním problémem</div><small>z @people.Count</small></button>
+</section>
+
+<section class="card">
+    <h2>Co je potřeba řešit</h2>
+    <ul class="todo">
+        <li><b>@total.Problems</b> povinných školení je prošlých nebo chybí – plán je přihlásí na nejbližší volné termíny.
+            <button class="link" @onclick="() => State.Go(Tab.Plan)">Otevřít plán (@plan.Assignments.Count přihlášek, odhad @Format.Kc(plan.EstimatedCost))</button></li>
+        @if (lapsing.Count > 0)
+        {
+            <li><b>@lapsing.Count</b> školení, kterému platnost teprve končí, <b>nestihne</b> žádný volný termín před expirací
+                (@string.Join(", ", lapsing.GroupBy(a => a.Requirement.Course.Code).Select(g => $"{g.Key} {g.Count()}")))
+                – příčina je kalendář nebo plná kapacita dřívějších termínů; řešením je vypsat dřívější/další termín.
+                <button class="link" @onclick="() => State.Go(Tab.Plan)">Zobrazit</button></li>
+        }
+        @foreach (var s in shortages)
+        {
+            <li><b>@s.CourseCode</b>: chybí @s.Shortfall míst – vypsat další termín.</li>
+        }
+        @if (shortages.Count == 0)
+        {
+            <li>Volné kapacity vypsaných termínů pokryjí všechny aktuální potřeby (@plan.Assignments.Count přihlášek).</li>
+        }
+        @if (onLeave > 0)
+        {
+            <li>@onLeave lidí je na rodičovské – nezapočítáváno, školení řešit před jejich návratem.</li>
+        }
+        @if (excludedTerms.Count > 0)
+        {
+            <li>@excludedTerms.Count termínů ve vstupních datech je nepoužitelných (@string.Join("; ", excludedTerms.Select(t => $"{t.Id}: {t.ExcludedReason}"))).
+                <button class="link" @onclick="() => State.Go(Tab.Quality)">Kvalita dat</button></li>
+        }
+    </ul>
+</section>
+
+<section class="card">
+    <h2>Stav podle školení</h2>
+    <Legend />
+    <div class="rows">
+        @foreach (var c in State.Data.Courses.Where(c => c.Audience.Kind != AudienceKind.Optional))
+        {
+            var rs = counted.Where(r => r.Course.Code == c.Code).ToList();
+            if (rs.Count == 0) continue;
+            var counts = StatusCounts.Of(rs);
+            <div class="row">
+                <div class="lbl">
+                    <button class="link" @onclick="@(() => State.Go(Tab.People, new PeopleFilter { CourseCode = c.Code }))">@c.Name</button>
+                    <small>@rs.Count povinných</small>
+                </div>
+                <StatusBar Counts="counts" />
+                <div class="nums">@counts.Valid / @counts.ExpiringSoon / @counts.Expired / @counts.Missing</div>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="card">
+    <h2>Stav podle útvarů</h2>
+    <Legend />
+    <div class="rows">
+        @foreach (var d in departments)
+        {
+            var rs = counted.Where(r => r.Employee.Department == d).ToList();
+            var counts = StatusCounts.Of(rs);
+            <div class="row">
+                <div class="lbl">
+                    <button class="link" @onclick="@(() => State.Go(Tab.People, new PeopleFilter { Department = d }))">@d</button>
+                    <small>@people.Count(e => e.Department == d) lidí · @Format.Pct(counts.OkShare) v pořádku</small>
+                </div>
+                <StatusBar Counts="counts" />
+                <div class="nums">@counts.Valid / @counts.ExpiringSoon / @counts.Expired / @counts.Missing</div>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    protected override void OnInitialized() => State.Changed += OnChanged;
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => State.Changed -= OnChanged;
+}

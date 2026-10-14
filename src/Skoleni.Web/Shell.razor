@@ -1,0 +1,80 @@
+@implements IDisposable
+@inject AppState State
+
+@if (State.Error is not null)
+{
+    <p class="msg">@State.Error</p>
+}
+else if (!State.Loaded)
+{
+    <p class="msg">Načítám data…</p>
+}
+else
+{
+    <header class="top">
+        <div class="top-in">
+            <h1>Evidence školení</h1>
+            <div class="controls">
+                <label>Stav k datu
+                    <input type="date" value="@State.AsOf.ToString("yyyy-MM-dd")" @onchange="OnDate" />
+                </label>
+                <label>„Brzy vyprší“ = do
+                    <select value="@State.SoonDays" @onchange="OnSoon">
+                        @foreach (var n in new[] { 30, 60, 90, 180 })
+                        {
+                            <option value="@n">@n dní</option>
+                        }
+                    </select>
+                </label>
+                @if (State.AsOf != State.Data.ExportDate)
+                {
+                    <button class="link" @onclick="() => State.SetAsOf(State.Data.ExportDate)">zpět na datum exportu</button>
+                }
+            </div>
+        </div>
+        <nav class="tabs" aria-label="Sekce">
+            @foreach (var (tab, label) in Tabs)
+            {
+                <button class="@(State.Tab == tab ? "on" : "")" aria-current="@(State.Tab == tab ? "page" : null)" @onclick="() => State.Go(tab)">@label</button>
+            }
+        </nav>
+    </header>
+    <main>
+        @switch (State.Tab)
+        {
+            case Tab.Overview: <OverviewView /> break;
+            case Tab.People: <PeopleView /> break;
+            case Tab.Plan: <PlanView /> break;
+            case Tab.Terms: <TermsView /> break;
+            case Tab.Quality: <QualityView /> break;
+        }
+    </main>
+    <footer>Fiktivní data, export z @Format.Date(State.Data.ExportDate). Rodná čísla ani volné poznámky z exportů se do aplikace nepřenášejí.</footer>
+}
+
+@code {
+    private static readonly (Tab, string)[] Tabs =
+    [
+        (Tab.Overview, "Přehled"), (Tab.People, "Lidé"), (Tab.Plan, "Plán přihlášení"), (Tab.Terms, "Termíny"), (Tab.Quality, "Kvalita dat"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.Changed += OnChanged;
+        await State.LoadAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnDate(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var d)) State.SetAsOf(d);
+    }
+
+    private void OnSoon(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var n)) State.SetSoonDays(n);
+    }
+
+    public void Dispose() => State.Changed -= OnChanged;
+}

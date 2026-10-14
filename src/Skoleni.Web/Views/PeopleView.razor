@@ -1,0 +1,123 @@
+@implements IDisposable
+@inject AppState State
+
+@{
+    var f = State.Filter;
+    var visible = State.Data.Employees.Where(e => Compliance.GroupOf(e, State.AsOf) != EmployeeGroup.Terminated).ToList();
+    var departments = visible.Select(e => e.Department).Distinct().Order().ToList();
+    var managers = visible.Select(e => e.ManagerId).Where(id => id is not null).Distinct()
+        .Select(id => State.EmployeeById[id!]).OrderBy(m => m.LastName, StringComparer.CurrentCulture).ToList();
+    var byEmployee = State.Requirements.ToLookup(r => r.Employee.Id);
+    var planned = State.Plan.Assignments.ToDictionary(a => (a.Requirement.Employee.Id, a.Requirement.Course.Code));
+    var rows = visible
+        .Where(e => f.Department == "" || e.Department == f.Department)
+        .Where(e => f.ManagerId == "" || e.ManagerId == f.ManagerId || e.Id == f.ManagerId)
+        .Where(e => f.Query == "" || $"{e.FirstName} {e.LastName} {e.Id} {e.Position}".Contains(f.Query, StringComparison.OrdinalIgnoreCase))
+        .Select(e =>
+        {
+            var all = byEmployee[e.Id].Where(r => f.CourseCode == "" || r.Course.Code == f.CourseCode).ToList();
+            var hit = all.Where(r => Matches(r)).ToList();
+            return (Employee: e, All: all, Hit: hit);
+        })
+        .Where(x => f.Status == "all" || x.Hit.Count > 0)
+        .OrderByDescending(x => x.Hit.Count).ThenBy(x => x.Employee.LastName, StringComparer.CurrentCulture)
+        .ToList();
+    string csvHref = CsvWriter.ToDataUri(CsvWriter.Write(
+        ["ID", "Příjmení", "Jméno", "Útvar", "Pozice", "Nadřízený", "Školení", "Stav", "Naposledy", "Platné do", "Navržený termín"],
+        rows.SelectMany(x => x.Hit.Select(r => new string?[]
+        {
+            x.Employee.Id, x.Employee.LastName, x.Employee.FirstName, x.Employee.Department, x.Employee.Position, State.ManagerName(x.Employee),
+            r.Course.Name, Format.Label(r.Status), Format.Date(r.LastCompleted), Format.Date(r.ValidUntil),
+            planned.TryGetValue((x.Employee.Id, r.Course.Code), out var a) ? $"{Format.Date(a.Term.Date)} ({a.Term.Id})" : "",
+        }))));
+}
+
+<section class="card">
+    <h2>Lidé a jejich školení</h2>
+    <div class="filters">
+        <input type="search" placeholder="Hledat jméno, ID, pozici…" value="@f.Query" @oninput="e => f.Query = e.Value?.ToString() ?? string.Empty" />
+        <select value="@f.Department" @onchange="e => f.Department = e.Value?.ToString() ?? string.Empty" aria-label="Útvar">
+            <option value="">Všechny útvary</option>
+            @foreach (var d in departments) { <option>@d</option> }
+        </select>
+        <select value="@f.ManagerId" @onchange="e => f.ManagerId = e.Value?.ToString() ?? string.Empty" aria-label="Nadřízený">
+            <option value="">Všichni nadřízení</option>
+            @foreach (var m in managers) { <option value="@m.Id">Tým: @m.FullName</option> }
+        </select>
+        <select value="@f.CourseCode" @onchange="e => f.CourseCode = e.Value?.ToString() ?? string.Empty" aria-label="Školení">
+            <option value="">Všechna školení</option>
+            @foreach (var c in State.Data.Courses.Where(c => c.Audience.Kind != AudienceKind.Optional)) { <option value="@c.Code">@c.Name</option> }
+        </select>
+        <select value="@f.Status" @onchange="e => f.Status = e.Value?.ToString() ?? ProblemKey" aria-label="Stav">
+            <option value="problem">Jen s problémem (vše kromě platných)</option>
+            <option value="@nameof(TrainingStatus.Expired)">Prošlé</option>
+            <option value="@nameof(TrainingStatus.Missing)">Chybí</option>
+            <option value="@nameof(TrainingStatus.ExpiringSoon)">Brzy vyprší</option>
+            <option value="@nameof(TrainingStatus.Valid)">Platné</option>
+            <option value="all">Všichni</option>
+        </select>
+        <a class="btn" download="lide-skoleni.csv" href="@csvHref">Export CSV</a>
+    </div>
+    <p class="muted">@rows.Count lidí</p>
+    <div class="tablewrap">
+        <table>
+            <thead><tr><th>Zaměstnanec</th><th>Útvar / pozice</th><th>Školení</th></tr></thead>
+            <tbody>
+            @foreach (var (e, all, hit) in rows)
+            {
+                var group = Compliance.GroupOf(e, State.AsOf);
+                var shown = f.Status == "all" ? all : hit;
+                <tr class="clickable" @onclick="() => open = open == e.Id ? null : e.Id">
+                    <td><b>@e.FullName</b> <small class="muted">@e.Id</small>
+                        @if (group != EmployeeGroup.Active) { <div><span class="tag">@Format.Label(group)</span></div> }</td>
+                    <td>@e.Department
+                        @if (e.DepartmentInferred) { <span class="tag" title="Útvar chyběl v datech a byl odvozen"> odvozeno</span> }
+                        <div class="muted">@e.Position</div></td>
+                    <td class="chips">
+                        @foreach (var r in shown) { <Badge Status="r.Status" Text="@r.Course.Code" /> }
+                        @if (shown.Count == 0) { <span class="muted">bez povinností</span> }
+                    </td>
+                </tr>
+                @if (open == e.Id)
+                {
+                    <tr class="detail"><td colspan="3">
+                        <div class="muted">Nadřízený: @(e.ManagerId is null ? "neuveden / neznámý" : State.ManagerName(e)) · Nástup: @Format.Date(e.HireDate)@(e.TerminationDate is null ? "" : $" · Ukončení: {Format.Date(e.TerminationDate)}")</div>
+                        <table class="inner">
+                            <thead><tr><th>Školení</th><th>Stav</th><th>Naposledy</th><th>Platí do</th><th>Navržený termín</th></tr></thead>
+                            <tbody>
+                            @foreach (var r in all)
+                            {
+                                <tr>
+                                    <td>@r.Course.Name</td>
+                                    <td><Badge Status="r.Status" />
+                                        @if (r.DaysLeft is { } days && r.Status != TrainingStatus.Valid) { <small class="muted"> @(days < 0 ? $"před {-days} dny" : $"za {days} dní")</small> }</td>
+                                    <td>@Format.Date(r.LastCompleted)</td>
+                                    <td>@(r.Course.Expires ? Format.Date(r.ValidUntil) : "bez expirace")</td>
+                                    <td>@(planned.TryGetValue((e.Id, r.Course.Code), out var a) ? $"{Format.Date(a.Term.Date)} ({a.Term.Id})" : "–")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </td></tr>
+                }
+            }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@code {
+    private const string ProblemKey = "problem";
+    private string? open;
+
+    private bool Matches(Requirement r) => State.Filter.Status switch
+    {
+        "all" => true,
+        "problem" => r.NeedsAction,
+        var s => r.Status.ToString() == s,
+    };
+
+    protected override void OnInitialized() => State.Changed += OnChanged;
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => State.Changed -= OnChanged;
+}
