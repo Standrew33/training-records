@@ -1,0 +1,4 @@
+node_modules
+dist
+# Surové exporty obsahují rodná čísla – do repozitáře nepatří. Do aplikace jde jen vyčištěný dataset.json.
+data-raw
