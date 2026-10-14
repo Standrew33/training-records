@@ -44,7 +44,7 @@ public sealed class AppState(HttpClient http)
         try
         {
             await using var stream = await http.GetStreamAsync("data/dataset.json");
-            Data = DatasetJsonContext.Deserialize(stream);
+            Data = await DatasetJsonContext.DeserializeAsync(stream);
             EmployeeById = Data.Employees.ToDictionary(e => e.Id);
             CourseByCode = Data.Courses.ToDictionary(c => c.Code);
             AsOf = Data.ExportDate;

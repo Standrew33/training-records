@@ -18,11 +18,11 @@ data-raw/*.csv ─► Skoleni.DataPrep ─► src/Skoleni.Web/wwwroot/data/datas
 | `src/Skoleni.Data` | `CsvTable` (RFC 4180 parser), `CzechDate`/`Money`/`Text`, čističe jednotlivých exportů a `DatasetBuilder`. Každá úprava dat se zapíše do `IssueLog`. |
 | `src/Skoleni.DataPrep` | Konzolový krok: surové CSV → `dataset.json`. |
 | `src/Skoleni.Web` | Blazor WebAssembly. Jen zobrazení; veškerá logika je v Core. |
-| `tests/Skoleni.Tests` | xUnit (113 testů): parsery, čištění každého druhu vady, pravidla platnosti, plánovač včetně property-testu proti hrubé síle, ochrana soukromí, kontroly invariantů na skutečných datech. |
+| `tests/Skoleni.Tests` | xUnit (109 testů, z toho 4 nad skutečnými exporty): parsery, čištění každého druhu vady, pravidla platnosti, plánovač včetně property-testu proti hrubé síle, ochrana soukromí, kontroly invariantů na skutečných datech. |
 
 ## Spuštění
 
-Potřeba je .NET SDK 9.
+Potřeba je .NET SDK 10.
 
 ```bash
 dotnet test                                       # testy (testy nad skutečnými exporty se přeskočí, pokud chybí data-raw/)
