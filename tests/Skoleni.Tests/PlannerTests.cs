@@ -34,7 +34,7 @@ public class PlannerTests
     [Fact]
     public void Excluded_cancelled_and_past_terms_are_never_used()
     {
-        var ds = Set([Emp("E1")], [Kyber], terms: [Term("T1", Today.AddDays(5), excluded: "zrušeno"), Term("T2", Today.AddDays(-3)), Term("T3", Today.AddDays(20))]);
+        var ds = Set([Emp("E1")], [Kyber], terms: [Term("T1", Today.AddDays(5), excluded: "cancelled"), Term("T2", Today.AddDays(-3)), Term("T3", Today.AddDays(20))]);
         Assert.Equal("T3", PlanFor(ds).Assignments.Single().Term.Id);
     }
 
@@ -48,7 +48,7 @@ public class PlannerTests
     [Fact]
     public void Most_urgent_gets_the_earliest_seat()
     {
-        // E1 platnost končí za 10 dní, E2 za 60 – jedno místo na dřívějším termínu musí dostat E1.
+        // E1 expires in 10 days, E2 in 60 - the single seat on the earlier term must go to E1.
         var ds = Set([Emp("E1"), Emp("E2")], [Kyber],
             [Done("E1", "KYBER", Today.AddDays(10).AddMonths(-12)), Done("E2", "KYBER", Today.AddDays(60).AddMonths(-12))],
             [Term("EARLY", Today.AddDays(5), capacity: 1), Term("LATE", Today.AddDays(30), capacity: 5)]);
@@ -123,7 +123,7 @@ public class PlannerTests
     public void Course_without_any_term_is_reported_with_a_specific_reason()
     {
         var ds = Set([Emp("E1")], [Kyber]);
-        Assert.Contains("žádný použitelný termín", PlanFor(ds).Unassigned.Single().Reason);
+        Assert.Contains("No usable term", PlanFor(ds).Unassigned.Single().Reason);
     }
 
     [Fact]
@@ -135,8 +135,8 @@ public class PlannerTests
     }
 
     /// <summary>
-    /// Důvěra v algoritmus: na náhodných malých instancích porovnáme plánovač s hrubou silou.
-    /// Pokud existuje rozdělení, ve kterém všichni stihnou lhůtu, musí ho plánovač najít.
+    /// Trust in the algorithm: on random small instances the planner is compared with brute force.
+    /// If an assignment exists in which everybody meets the deadline, the planner must find it.
     /// </summary>
     [Fact]
     public void Finds_an_all_on_time_assignment_whenever_one_exists_property_test()
@@ -159,9 +159,9 @@ public class PlannerTests
             if (!AllOnTimePossible(deadlines, terms)) continue;
             feasibleRounds++;
             Assert.Empty(plan.Unassigned);
-            Assert.All(plan.Assignments, a => Assert.False(a.AfterDeadline, $"kolo {round}: {a.Requirement.Employee.Id} pozdě, ač řešení bez zpoždění existuje"));
+            Assert.All(plan.Assignments, a => Assert.False(a.AfterDeadline, $"round {round}: {a.Requirement.Employee.Id} is late although a no-delay solution exists"));
         }
-        Assert.True(feasibleRounds > 50, "test má pokrýt dost proveditelných instancí");
+        Assert.True(feasibleRounds > 50, "the test should cover enough feasible instances");
     }
 
     private static bool AllOnTimePossible(IReadOnlyList<DateOnly> deadlines, IReadOnlyList<Term> terms)

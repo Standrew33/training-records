@@ -8,7 +8,7 @@ public sealed record StatusCounts(int Valid, int ExpiringSoon, int Expired, int 
     public int Total => Valid + ExpiringSoon + Expired + Missing;
     public int Problems => Expired + Missing;
 
-    /// <summary>Podíl povinností, které nejsou prošlé ani chybějící (tj. platné + brzy vyprší).</summary>
+    /// <summary>Share of obligations that are neither expired nor missing (i.e. valid + expiring soon).</summary>
     public double OkShare => Total == 0 ? 1 : (double)(Valid + ExpiringSoon) / Total;
 
     public static StatusCounts Of(IEnumerable<Requirement> reqs)
@@ -22,14 +22,14 @@ public sealed record StatusCounts(int Valid, int ExpiringSoon, int Expired, int 
 public static class Statistics
 {
     /// <summary>
-    /// Co se počítá do přehledů: aktivní a nastupující. Rodičovská se nezapočítává (nikdo po ní nechce školení,
-    /// dokud je mimo práci), ukončení jsou už vyřazeni v <see cref="Compliance.Compute"/>.
+    /// What counts towards the overviews: active and starting employees. Parental leave is not counted (nobody asks for
+    /// training while they are away), terminated employees are already dropped in <see cref="Compliance.Compute"/>.
     /// </summary>
     public static IEnumerable<Requirement> Counted(IEnumerable<Requirement> reqs, DateOnly asOf) =>
         reqs.Where(r => Compliance.GroupOf(r.Employee, asOf) is EmployeeGroup.Active or EmployeeGroup.Starting);
 }
 
-/// <summary>Zápis CSV pro Excel (středník, UTF-8 s BOM) odolný proti vložení vzorců (CSV/Excel injection).</summary>
+/// <summary>CSV writer for Excel (semicolon, UTF-8 with BOM) that is safe against formula injection (CSV/Excel injection).</summary>
 public static class CsvWriter
 {
     public static string Escape(string? value)

@@ -1,7 +1,7 @@
 namespace Skoleni.Core.Models;
 
-// Datový model „po vyčištění“. Žádný z typů neobsahuje rodné číslo ani volné poznámky ze zdroje –
-// to je záměr (minimalizace osobních údajů), ne opomenutí.
+// The cleaned data model. None of these types carries a national identification number or free-text notes
+// from the source exports - that is deliberate (data minimisation), not an omission.
 
 public enum EmployeeState { Active, ParentalLeave, Terminated }
 
@@ -23,7 +23,7 @@ public sealed record Employee(
 
 public enum AudienceKind { Everyone, Department, Position, Optional }
 
-/// <summary>Komu se školení ukládá. Hodnoty jsou už při čištění sjednocené na kanonický zápis útvaru/pozice.</summary>
+/// <summary>Who must take a course. Values are already normalised to the canonical spelling of department / position.</summary>
 public sealed record Audience(AudienceKind Kind, IReadOnlyList<string> Values)
 {
     public bool Applies(Employee e) => Kind switch
@@ -35,7 +35,7 @@ public sealed record Audience(AudienceKind Kind, IReadOnlyList<string> Values)
     };
 }
 
-/// <param name="ValidityMonths">null = neuvedeno (nepovinné), 0 = jednorázové bez expirace.</param>
+/// <param name="ValidityMonths">null = not stated (optional course), 0 = one-off course that never expires.</param>
 public sealed record Course(string Code, string Name, int? ValidityMonths, Audience Audience)
 {
     public bool Expires => ValidityMonths is > 0;
@@ -63,7 +63,7 @@ public sealed record Term(
     string? ExcludedReason,
     bool Weekend)
 {
-    /// <summary>Volná místa. Přeplněný termín (obsazeno &gt; kapacita) má 0, nikdy záporné číslo.</summary>
+    /// <summary>Free seats. An overbooked term (booked &gt; capacity) has 0, never a negative number.</summary>
     public int FreeSeats => Math.Max(0, Capacity - Booked);
 
     public bool Usable => ExcludedReason is null && Date is not null;
@@ -71,13 +71,13 @@ public sealed record Term(
     public bool Overlaps(Term other) =>
         Date is not null && Date == other.Date &&
         (Start is null || End is null || other.Start is null || other.End is null
-            ? true // neznámý čas = raději předpokládáme kolizi
+            ? true // unknown time: assume a collision rather than risk a double booking
             : Start < other.End && other.Start < End);
 }
 
 public enum IssueSeverity { Info, Warning, Error }
 
-/// <summary>Jedna zaznamenaná vada vstupních dat a to, jak s ní bylo naloženo.</summary>
+/// <summary>One recorded defect in the input data and how it was handled.</summary>
 public sealed record Issue(string Source, IssueSeverity Severity, string Ref, string Description, string Resolution);
 
 public sealed record Dataset(

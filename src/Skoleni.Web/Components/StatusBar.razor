@@ -1,8 +1,8 @@
-<div class="stack" role="img" aria-label="Platné @Counts.Valid, brzy vyprší @Counts.ExpiringSoon, prošlé @Counts.Expired, chybí @Counts.Missing">
-    @Seg("ok", Counts.Valid, "Platné")
-    @Seg("soon", Counts.ExpiringSoon, "Brzy vyprší")
-    @Seg("bad", Counts.Expired, "Prošlé")
-    @Seg("miss", Counts.Missing, "Chybí")
+<div class="stack" role="img" aria-label="Valid @Counts.Valid, expiring soon @Counts.ExpiringSoon, expired @Counts.Expired, missing @Counts.Missing">
+    @Seg("ok", Counts.Valid, "Valid")
+    @Seg("soon", Counts.ExpiringSoon, "Expiring soon")
+    @Seg("bad", Counts.Expired, "Expired")
+    @Seg("miss", Counts.Missing, "Missing")
 </div>
 
 @code {

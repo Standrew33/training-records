@@ -32,10 +32,10 @@ public class CsvTableTests
     [Fact]
     public void Tolerates_bom_crlf_blank_lines_and_ragged_rows()
     {
-        var rows = CsvTable.Parse("﻿a;b;c\r\n1;2\r\n\r\n;;\r\n3;4;5;6\r\n");
+        var rows = CsvTable.Parse("\uFEFFa;b;c\r\n1;2\r\n\r\n;;\r\n3;4;5;6\r\n");
         Assert.Equal(2, rows.Count);
-        Assert.Equal("", rows[0]["c"]);   // krátký řádek doplněn
-        Assert.Equal("5", rows[1]["c"]);  // dlouhý oříznut
+        Assert.Equal("", rows[0]["c"]);   // short row padded
+        Assert.Equal("5", rows[1]["c"]);  // long row truncated
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class DateParsingTests
     }
 
     [Theory]
-    [InlineData("31. 9. 2026")]   // září má 30 dní – nesmí se „opravit“ na 1. 10.
+    [InlineData("31. 9. 2026")]   // September has 30 days - must not be "fixed" to 1 Oct
     [InlineData("30. 2. 2025")]
     [InlineData("")]
     [InlineData("brzy")]
@@ -79,7 +79,7 @@ public class MoneyAndTextTests
 {
     [Theory]
     [InlineData("1 500,00", 1500)]
-    [InlineData("1 500,00", 1500)]
+    [InlineData("1\u00a0500,00", 1500)]
     [InlineData("2 100 Kč", 2100)]
     [InlineData("380,- Kč", 380)]
     [InlineData("zdarma", 0)]

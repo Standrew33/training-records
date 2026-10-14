@@ -2,10 +2,10 @@ using System.Text;
 
 namespace Skoleni.Data.Parsing;
 
-/// <summary>Jeden řádek CSV s hlavičkou. Chybějící sloupec = prázdný řetězec (exporty mají nestejnou šířku řádků).</summary>
+/// <summary>One CSV row with a header. A missing column = empty string (the exports have rows of uneven width).</summary>
 public sealed class CsvRow(int line, IReadOnlyDictionary<string, string> values)
 {
-    /// <summary>Číslo řádku v souboru (1 = hlavička) – pro dohledatelnost v hlášení o vadách.</summary>
+    /// <summary>Line number in the file (1 = header) - so a defect report can be traced back.</summary>
     public int Line { get; } = line;
 
     public string this[string column] => values.TryGetValue(column, out var v) ? v : "";
@@ -14,15 +14,15 @@ public sealed class CsvRow(int line, IReadOnlyDictionary<string, string> values)
 }
 
 /// <summary>
-/// Minimální RFC 4180 parser: uvozovky, zdvojené uvozovky, nový řádek uvnitř uvozovek.
-/// Oddělovač se určuje z hlavičky (zaměstnanci.csv má čárku, ostatní středník).
-/// Řádky bez dat se přeskočí; delší řádky se oříznou na hlavičku, kratší se doplní prázdnem.
+/// Minimal RFC 4180 parser: quotes, doubled quotes, newlines inside quotes.
+/// The delimiter is detected from the header (zamestnanci.csv uses a comma, the others a semicolon).
+/// Blank rows are skipped; longer rows are truncated to the header, shorter ones padded with empty values.
 /// </summary>
 public static class CsvTable
 {
     public static IReadOnlyList<CsvRow> Parse(string text)
     {
-        text = text.TrimStart('﻿');
+        text = text.TrimStart('\uFEFF');
         var delimiter = DetectDelimiter(text);
         var records = ReadRecords(text, delimiter);
         if (records.Count == 0) return [];

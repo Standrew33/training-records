@@ -11,8 +11,8 @@ public static partial class CzechDate
     public enum Kind { Iso, Czech, ExcelSerial }
 
     /// <summary>
-    /// Podporuje 2019-01-06, „6. 1. 2019“, 06.01.2019 a excelová sériová čísla (43552).
-    /// Nemožná data (31. 9.) a prázdné hodnoty vrací jako neúspěch – nikdy je „neopravuje“ na nejbližší platné.
+    /// Supports 2019-01-06, "6. 1. 2019", 06.01.2019 and Excel serial numbers (43552).
+    /// Impossible dates (31. 9.) and empty values are reported as a failure - they are never "fixed" to the nearest valid date.
     /// </summary>
     public static bool TryParse(string? raw, out DateOnly date, out Kind kind)
     {
@@ -25,7 +25,7 @@ public static partial class CzechDate
         {
             kind = Kind.ExcelSerial;
             var serial = int.Parse(s, CultureInfo.InvariantCulture);
-            // Excel počítá 1900 jako přestupný; pro data po 1. 3. 1900 platí epocha 30. 12. 1899.
+            // Excel treats 1900 as a leap year; for dates after 1 Mar 1900 the epoch is 30 Dec 1899.
             if (serial < 61) return false;
             date = new DateOnly(1899, 12, 30).AddDays(serial);
             return true;
@@ -43,20 +43,20 @@ public static partial class CzechDate
 
 public static class Money
 {
-    /// <summary>„1 500,00“, „2 100 Kč“, „380,- Kč“, „zdarma“ → číslo; prázdné nebo nerozpoznatelné → null.</summary>
+    /// <summary>"1 500,00", "2 100 Kč", "380,- Kč", "zdarma" (free) -> number; empty or unrecognisable -> null.</summary>
     public static decimal? Parse(string? raw)
     {
         var s = (raw ?? "").Trim().ToLowerInvariant();
         if (s.Length == 0) return null;
         if (s == "zdarma") return 0m;
-        s = s.Replace("kč", "").Replace(",-", "").Replace(' ', ' ').Replace(" ", "").Replace(',', '.');
+        s = s.Replace("kč", "").Replace(",-", "").Replace('\u00a0', ' ').Replace(" ", "").Replace(',', '.');
         return decimal.TryParse(s, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var v) ? v : null;
     }
 }
 
 public static class Text
 {
-    /// <summary>Klíč pro porovnání zápisů: bez diakritiky, malá písmena, jedna mezera.</summary>
+    /// <summary>Key for comparing spellings: no diacritics, lower case, single spaces.</summary>
     public static string Key(string? s)
     {
         var d = (s ?? "").Normalize(NormalizationForm.FormD);
@@ -66,7 +66,7 @@ public static class Text
         return Regex.Replace(sb.ToString().ToLowerInvariant(), @"\s+", " ").Trim();
     }
 
-    /// <summary>„  LUCIE“ → „Lucie“, „růžička“ → „Růžička“, „Nováková-Malá“ → „Nováková-Malá“.</summary>
+    /// <summary>"  LUCIE" -> "Lucie", "růžička" -> "Růžička", "Nováková-Malá" stays "Nováková-Malá".</summary>
     public static string TitleCase(string? s)
     {
         var chars = (s ?? "").Trim().ToLowerInvariant().ToCharArray();

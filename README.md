@@ -1,43 +1,43 @@
-# Evidence školení
+# Training records
 
-Webová aplikace nad čtyřmi exporty (zaměstnanci, absolvovaná školení, katalog, termíny): kdo je jak proškolen, komu končí platnost, co řešit a koho přihlásit na který termín s ohledem na kapacitu.
+A web application over four exports (employees, completed trainings, catalogue, terms): who is trained how well, whose validity is ending, what to resolve, and whom to sign up for which term given limited capacity.
 
-Texty k zadání: [ZPRAVA.md](ZPRAVA.md) (co, proč, předpoklady, co chybí) · [AI_ZAZNAM.md](AI_ZAZNAM.md) (použití AI).
+Assignment texts: [REPORT.md](REPORT.md) (what, why, assumptions, what is missing) · [AI_LOG.md](AI_LOG.md) (AI usage).
 
-## Architektura
+## Architecture
 
 ```
 data-raw/*.csv ─► Skoleni.DataPrep ─► src/Skoleni.Web/wwwroot/data/dataset.json ─► Skoleni.Web (Blazor WASM)
- (rodná čísla,       používá            (vyčištěno, bez rodných čísel               používá Skoleni.Core
-  není v gitu)       Skoleni.Data        a volných poznámek; je v gitu)             (stavy, plánovač, statistiky)
+ (national IDs,      uses                (cleaned, without national IDs               uses Skoleni.Core
+  not in git)        Skoleni.Data         and free-text notes; committed)             (status, planner, statistics)
 ```
 
-| Projekt | Role |
+| Project | Role |
 |---|---|
-| `src/Skoleni.Core` | Doména: modely, `Compliance` (stav povinného školení), `Planner` (přihlášení na termíny), `Statistics`, `CsvWriter`. Bez závislostí (běží v prohlížeči). |
-| `src/Skoleni.Data` | `CsvTable` (RFC 4180 parser), `CzechDate`/`Money`/`Text`, čističe jednotlivých exportů a `DatasetBuilder`. Každá úprava dat se zapíše do `IssueLog`. |
-| `src/Skoleni.DataPrep` | Konzolový krok: surové CSV → `dataset.json`. |
-| `src/Skoleni.Web` | Blazor WebAssembly. Jen zobrazení; veškerá logika je v Core. |
-| `tests/Skoleni.Tests` | xUnit (109 testů, z toho 4 nad skutečnými exporty): parsery, čištění každého druhu vady, pravidla platnosti, plánovač včetně property-testu proti hrubé síle, ochrana soukromí, kontroly invariantů na skutečných datech. |
+| `src/Skoleni.Core` | Domain: models, `Compliance` (status of a mandatory training), `Planner` (sign-ups for terms), `Statistics`, `CsvWriter`. No dependencies (runs in the browser). |
+| `src/Skoleni.Data` | `CsvTable` (RFC 4180 parser), `CzechDate`/`Money`/`Text`, a cleaner per export and `DatasetBuilder`. Every data change is written to an `IssueLog`. |
+| `src/Skoleni.DataPrep` | Console step: raw CSV → `dataset.json`. |
+| `src/Skoleni.Web` | Blazor WebAssembly. Presentation only; all logic is in Core. |
+| `tests/Skoleni.Tests` | xUnit (109 tests, 4 of them over the real exports): parsers, cleaning of every kind of defect, validity rules, the planner including a property test against brute force, privacy, invariants on the real data. |
 
-## Spuštění
+## Running
 
-Potřeba je .NET SDK 10.
+Requires the .NET 10 SDK.
 
 ```bash
-dotnet test                                       # testy (testy nad skutečnými exporty se přeskočí, pokud chybí data-raw/)
-dotnet run --project src/Skoleni.DataPrep         # jen pokud změníte exporty v data-raw/ (výchozí datum exportu 2026-10-01)
-dotnet run --project src/Skoleni.Web              # lokální server
+dotnet test                                       # tests (those over the real exports are skipped when data-raw/ is missing)
+dotnet run --project src/Skoleni.DataPrep         # only if you change the exports in data-raw/ (default export date 2026-10-01)
+dotnet run --project src/Skoleni.Web              # local server
 ```
 
-## Citlivá data
+## Sensitive data
 
-- Surové exporty obsahují rodná čísla a jsou v `.gitignore`. Rodné číslo se čte jen k nalezení duplicitních osob a nikam se neukládá; modely `Employee`, `Completion` ani `Term` pro ně ani pro volný text nemají pole (test `Model_types_have_no_member_...`).
-- Poznámky ze zdroje (obsahují např. vzorce typu `=HYPERLINK(...)`) se nepřebírají a CSV exporty z aplikace buňky začínající `= + - @` neutralizují.
-- Aplikace běží celá v prohlížeči; žádná data neodesílá.
+- The raw exports contain national ID numbers (rodné číslo) and are in `.gitignore`. The number is read only to find duplicate people and is never stored; the `Employee`, `Completion` and `Term` models have no field for it or for free text (test `Model_types_have_no_member_...`).
+- Notes from the source (they contain e.g. formulas like `=HYPERLINK(...)`) are not carried over, and the CSV exports from the app neutralise cells starting with `= + - @`.
+- The app runs entirely in the browser and sends no data anywhere.
 
-## Provoz a nasazení
+## Operations and deployment
 
-`.github/workflows/deploy.yml`: při každém pushi a PR běží `dotnet test`; po pushi do `main` se Blazor aplikace publikuje na GitHub Pages (přepíše `<base href>` na název repozitáře). V repozitáři je potřeba jednou nastavit Settings → Pages → Source: *GitHub Actions*.
+`.github/workflows/deploy.yml`: `dotnet test` runs on every push and PR; after a push to `main` the Blazor app is published to GitHub Pages (the `<base href>` is rewritten to the repository name). Set Settings → Pages → Source: *GitHub Actions* once in the repository.
 
-Nový export: zkopírovat CSV do `data-raw/`, spustit DataPrep, zkontrolovat záložku *Kvalita dat*, commitnout nový `dataset.json`.
+New export: copy the CSVs into `data-raw/`, run DataPrep, review the *Data quality* tab, commit the new `dataset.json`.

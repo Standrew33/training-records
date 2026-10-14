@@ -4,15 +4,15 @@ using Skoleni.Data.Parsing;
 
 namespace Skoleni.Data.Cleaning;
 
-/// <summary>Přiřadí zapsaný kód školení ke kódu z katalogu.</summary>
+/// <summary>Maps a course code as written in the data to a code from the catalogue.</summary>
 public sealed class CourseCodeResolver(IEnumerable<string> catalogCodes)
 {
     private readonly string[] codes = catalogCodes.ToArray();
 
     /// <summary>
-    /// Opravuje jen to, co je nepochybné: mezery, velikost písmen, „_“ nebo mezera místo „-“,
-    /// a záměnu písmene za číslici (KYB3R → KYBER), pokud je shoda jednoznačná.
-    /// „BOZP-X“ by byl odhad (X → Z?), takže se vrací jako nerozpoznané a hlásí se.
+    /// Fixes only what is beyond doubt: whitespace, letter case, "_" or a space instead of "-", and a letter swapped
+    /// for a digit (KYB3R -> KYBER) when the match is unique. "BOZP-X" would be a guess (X -> Z?), so it comes back
+    /// unrecognised and is reported.
     /// </summary>
     public (string? Code, bool Changed) Resolve(string? raw)
     {
@@ -42,9 +42,9 @@ public static class CatalogCleaner
             var validity = ParseValidity(row.Trimmed("platnost_mesicu"), code, log);
             var audience = ParseAudience(row.Trimmed("povinne_pro"), code, knownDepartments, knownPositions, log);
             if (validity == 0)
-                log.Info(Sources.Catalog, code, "Platnost 0 měsíců.", "Chápáno jako jednorázové školení bez expirace.");
+                log.Info(Sources.Catalog, code, "Validity of 0 months.", "Interpreted as a one-off training that never expires.");
             if (validity is null && audience.Kind != AudienceKind.Optional)
-                log.Warn(Sources.Catalog, code, "Povinné školení bez uvedené platnosti.", "Počítá se jako bez expirace – ověřit s garantem školení.");
+                log.Warn(Sources.Catalog, code, "Mandatory training without a stated validity.", "Treated as non-expiring - confirm with the training owner.");
             courses.Add(new Course(code, row.Trimmed("nazev"), validity, audience));
         }
         return courses;
@@ -58,10 +58,10 @@ public static class CatalogCleaner
         if (m.Success)
         {
             var converted = int.Parse(m.Groups[1].Value) * 12;
-            log.Info(Sources.Catalog, code, $"Platnost zapsána slovy („{raw}“).", $"Převedeno na {converted} měsíců.");
+            log.Info(Sources.Catalog, code, $"Validity written in words (\"{raw}\").", $"Converted to {converted} months.");
             return converted;
         }
-        log.Error(Sources.Catalog, code, $"Nerozpoznaná platnost „{raw}“.", "Školení se bere jako bez expirace.");
+        log.Error(Sources.Catalog, code, $"Unrecognised validity \"{raw}\".", "Treated as non-expiring.");
         return null;
     }
 
@@ -75,17 +75,17 @@ public static class CatalogCleaner
             : (AudienceKind.Optional, [], "");
         if (prefix.Length == 0)
         {
-            log.Error(Sources.Catalog, code, $"Nerozpoznané „povinne_pro“: „{raw}“.", "Školení je bráno jako nepovinné, nikomu se nevyhodnocuje.");
+            log.Error(Sources.Catalog, code, $"Unrecognised \"povinne_pro\" (mandatory for): \"{raw}\".", "Treated as optional, so it is evaluated for nobody.");
             return new Audience(AudienceKind.Optional, []);
         }
 
         var values = new List<string>();
         foreach (var v in raw[prefix.Length..].Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
         {
-            // sjednotit na zápis, který se v evidenci skutečně vyskytuje
+            // unify to the spelling that actually occurs in the employee register
             var match = known.FirstOrDefault(k => Text.Key(k) == Text.Key(v));
             if (match is null)
-                log.Warn(Sources.Catalog, code, $"{(kind == AudienceKind.Department ? "Útvar" : "Pozice")} „{v}“ z katalogu se v evidenci zaměstnanců nevyskytuje.", "Nikomu se nepřiřadí.");
+                log.Warn(Sources.Catalog, code, $"{(kind == AudienceKind.Department ? "Department" : "Position")} \"{v}\" from the catalogue does not occur in the employee register.", "Assigned to nobody.");
             values.Add(match ?? v);
         }
         return new Audience(kind, values);

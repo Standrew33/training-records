@@ -6,11 +6,11 @@
 }
 
 <section class="card">
-    <h2>Kvalita vstupních dat</h2>
+    <h2>Input data quality</h2>
     <p class="muted">
-        Co jsme ve čtyřech exportech našli a jak s tím aplikace naložila. Nic se neopravuje ani nevyřazuje mlčky.
-        <b>Chyba</b> = problém, který změnil výsledky (např. vyřazený záznam); <b>varování</b> = úprava nebo podezření, které by měl někdo ověřit;
-        <b>info</b> = kosmetika (formát data, velikost písmen).
+        What we found in the four exports and how the app dealt with it. Nothing is silently corrected or dropped.
+        An <b>error</b> is a problem that changed the results (e.g. a dropped record); a <b>warning</b> is a correction or suspicion that someone should verify;
+        <b>info</b> is cosmetic (date format, letter case).
     </p>
     <div class="kpis small">
         @foreach (var s in new[] { IssueSeverity.Error, IssueSeverity.Warning, IssueSeverity.Info })
@@ -20,15 +20,15 @@
         }
     </div>
     <div class="filters">
-        <select value="@source" @onchange="e => source = e.Value?.ToString() ?? string.Empty" aria-label="Zdroj">
-            <option value="">Všechny zdroje</option>
+        <select value="@source" @onchange="e => source = e.Value?.ToString() ?? string.Empty" aria-label="Source">
+            <option value="">All sources</option>
             @foreach (var s in issues.Select(i => i.Source).Distinct()) { <option>@s</option> }
         </select>
-        <span class="muted">@shown.Count záznamů</span>
+        <span class="muted">@shown.Count records</span>
     </div>
     <div class="tablewrap">
         <table>
-            <thead><tr><th>Zdroj</th><th>Typ</th><th>Odkaz</th><th>Problém</th><th>Řešení</th></tr></thead>
+            <thead><tr><th>Source</th><th>Type</th><th>Reference</th><th>Problem</th><th>Resolution</th></tr></thead>
             <tbody>
             @foreach (var i in shown)
             {

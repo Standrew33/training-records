@@ -2,10 +2,10 @@ using Skoleni.Core.Models;
 
 namespace Skoleni.Core.Domain;
 
-/// <param name="AfterDeadline">Termín je až po lhůtě (u končící platnosti = po expiraci). U už prošlých / chybějících je to vždy pravda.</param>
+/// <param name="AfterDeadline">The term falls after the deadline (for a training about to expire: after it expires). Always true for already expired / missing trainings.</param>
 public sealed record Assignment(Requirement Requirement, Term Term, bool AfterDeadline)
 {
-    /// <summary>Důležité varování: školení ještě platí, ale přidělený termín je až po vypršení.</summary>
+    /// <summary>The important warning: the training is still valid today, but the assigned term is after it lapses.</summary>
     public bool WillLapse => AfterDeadline && Requirement.Status == TrainingStatus.ExpiringSoon;
 }
 
@@ -28,21 +28,21 @@ public sealed class Plan
 }
 
 /// <summary>
-/// Doporučení, koho přihlásit na který termín.
+/// Recommendation of who to sign up for which term.
 ///
-/// Algoritmus (earliest-deadline-first, jednotkové úlohy na místech s pevným časem):
-///  1. potřeby se seřadí podle lhůty (prošlé a chybějící mají lhůtu „dnes“, ostatní datum expirace),
-///  2. každá dostane nejbližší termín s volným místem, který lhůtu stihne,
-///  3. když žádný volný termín lhůtu nestihne, dostane nejbližší volný a je označena AfterDeadline,
-///  4. když volné místo není vůbec, skončí v Unassigned s důvodem (signál pro vypsání dalšího termínu).
+/// Algorithm (earliest-deadline-first; unit jobs on seats with fixed times):
+///  1. demands are sorted by deadline (expired and missing ones have deadline "today", the others their expiry date),
+///  2. each gets the earliest term with a free seat that meets the deadline,
+///  3. if no free term meets the deadline, it gets the earliest free one and is marked AfterDeadline,
+///  4. if there is no free seat at all, it ends up in Unassigned with a reason (a signal to schedule another term).
 ///
-/// Vlastnost, na které stojí důvěra: pokud existuje přiřazení, kde všichni stihnou lhůtu, plánovač ho najde
-/// (EDF je pro tuto úlohu optimální; ověřeno property-testem proti hrubé síle).
-/// Vědomá volba: nejdřív ti, kdo už jsou po lhůtě – minimalizuje to celkové zpoždění ve dnech, i když tím
-/// případně o „nový“ prošlý termín přijde někdo, komu platnost teprve končí.
+/// The property trust rests on: if an assignment exists in which everybody meets the deadline, the planner finds it
+/// (EDF is optimal for this problem; verified by a property test against brute force).
+/// A deliberate choice: people already past the deadline go first - it minimises total delay in days, even if it may
+/// cost somebody whose validity is only about to end a "new" lapse.
 ///
-/// Tvrdá omezení: kapacita (volné místo = kapacita − obsazeno, nikdy záporné), nepřihlašovat na termín po datu
-/// ukončení poměru, nepřihlašovat jednoho člověka na dva kolidující termíny. Rodičovská a ukončení se neplánují.
+/// Hard constraints: capacity (free seats = capacity - booked, never negative), no booking after the employment ends,
+/// no two colliding terms for one person. Parental leave and terminated employees are not planned.
 /// </summary>
 public static class Planner
 {
@@ -54,8 +54,8 @@ public static class Planner
         var demand = requirements
             .Where(r => r.NeedsAction && Compliance.GroupOf(r.Employee, asOf) is EmployeeGroup.Active or EmployeeGroup.Starting)
             .OrderBy(r => r.Deadline ?? DateOnly.MaxValue)
-            // při shodné lhůtě dřív to školení, které má méně termínů na výběr – jinak by si člověk
-            // mohl „zabrat“ jediný termín, který potřeboval pro druhé školení (kolize ve stejný čas)
+            // with equal deadlines the course with fewer terms to choose from goes first - otherwise a person could
+            // "use up" the only term needed for their other course (collision at the same time)
             .ThenBy(r => terms.Count(t => t.CourseCode == r.Course.Code))
             .ThenBy(r => r.Employee.Id, StringComparer.Ordinal)
             .ThenBy(r => r.Course.Code, StringComparer.Ordinal)
@@ -78,8 +78,8 @@ public static class Planner
             {
                 var anyTerm = terms.Any(t => t.CourseCode == req.Course.Code);
                 unassigned.Add(new Unassigned(req, anyTerm
-                    ? "Všechny termíny jsou plné, kolidují, nebo jsou až po ukončení pracovního poměru."
-                    : "Není vypsán žádný použitelný termín."));
+                    ? "All terms are full, collide with another term, or fall after the employment ends."
+                    : "No usable term is scheduled."));
                 continue;
             }
 

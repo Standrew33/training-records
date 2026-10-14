@@ -12,13 +12,13 @@ public sealed class PeopleFilter
     public string Department { get; set; } = "";
     public string ManagerId { get; set; } = "";
     public string CourseCode { get; set; } = "";
-    /// <summary>"problem" = vše kromě platných, "all" = všichni, jinak název TrainingStatus.</summary>
+    /// <summary>"problem" = everything except valid, "all" = everybody, otherwise a TrainingStatus name.</summary>
     public string Status { get; set; } = "problem";
 }
 
 /// <summary>
-/// Jediné místo se stavem aplikace: dataset, zvolené datum a práh „brzy vyprší“, z nich odvozené povinnosti a plán.
-/// Veškerá doménová logika je v Skoleni.Core; tady se jen volá a výsledek drží.
+/// The single place holding application state: the dataset, the chosen date and the "expiring soon" threshold, and the
+/// requirements and plan derived from them. All domain logic lives in Skoleni.Core; this class only calls it and keeps the result.
 /// </summary>
 public sealed class AppState(HttpClient http)
 {
@@ -52,7 +52,7 @@ public sealed class AppState(HttpClient http)
         }
         catch (Exception ex)
         {
-            Error = $"Nepodařilo se načíst data: {ex.Message}";
+            Error = $"Failed to load the data: {ex.Message}";
         }
         Changed?.Invoke();
     }

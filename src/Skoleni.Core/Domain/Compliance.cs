@@ -6,8 +6,8 @@ public enum TrainingStatus { Valid, ExpiringSoon, Expired, Missing }
 
 public enum EmployeeGroup { Active, Starting, ParentalLeave, Terminated }
 
-/// <summary>Jedna povinnost jednoho zaměstnance: „má/nemá platné školení X k danému dni“.</summary>
-/// <param name="Deadline">Do kdy musí být školení absolvováno. null = bez expirace / nic nehrozí.</param>
+/// <summary>One obligation of one employee: "has / has not a valid training X on the given day".</summary>
+/// <param name="Deadline">By when the training must be completed. null = no expiry, nothing at stake.</param>
 public sealed record Requirement(
     Employee Employee,
     Course Course,
@@ -23,8 +23,8 @@ public sealed record Requirement(
 public static class Compliance
 {
     /// <summary>
-    /// Předpoklad: nový zaměstnanec (nebo zaměstnanec bez jakéhokoli záznamu) má na povinné školení
-    /// tolik dní od nástupu. Zdroj žádnou lhůtu neuvádí, takže jde o konfigurovatelnou volbu, ne fakt.
+    /// Assumption: a new hire (or an employee with no record at all) has this many days from the start date to complete
+    /// a mandatory training. The source states no deadline, so this is a configurable choice, not a fact.
     /// </summary>
     public const int DefaultHireGraceDays = 30;
 
@@ -37,8 +37,8 @@ public static class Compliance
     }
 
     /// <summary>
-    /// Platnost se počítá z data absolvování a katalogu (ne ze sloupce platnost_do v exportu, který je nespolehlivý).
-    /// Poslední den platnosti je včetně: školení platné do 10. 5. je 10. 5. ještě platné.
+    /// Validity is computed from the completion date and the catalogue (not from the export's platnost_do column, which is unreliable).
+    /// The last day of validity is inclusive: a training valid until 10 May is still valid on 10 May.
     /// </summary>
     public static IReadOnlyList<Requirement> Compute(Dataset ds, DateOnly asOf, int soonDays, int hireGraceDays = DefaultHireGraceDays)
     {
@@ -61,7 +61,7 @@ public static class Compliance
     {
         if (lastCompleted is null)
         {
-            // Nikdy absolvováno: lhůta = nástup + odklad, nejdřív však dnes (už je pozdě).
+            // Never completed: deadline = start date + grace period, but no earlier than today (it is already late).
             var due = (emp.HireDate ?? asOf).AddDays(hireGraceDays);
             var deadline = emp.HireDate is not null && due > asOf ? due : asOf;
             return new Requirement(emp, course, TrainingStatus.Missing, null, null, null, deadline);
@@ -69,7 +69,7 @@ public static class Compliance
         if (!course.Expires)
             return new Requirement(emp, course, TrainingStatus.Valid, lastCompleted, null, null, null);
 
-        var validUntil = lastCompleted.Value.AddMonths(course.ValidityMonths!.Value); // DateOnly ořízne konec měsíce
+        var validUntil = lastCompleted.Value.AddMonths(course.ValidityMonths!.Value); // DateOnly clamps to the end of the month
         var daysLeft = validUntil.DayNumber - asOf.DayNumber;
         var status = daysLeft < 0 ? TrainingStatus.Expired : daysLeft <= soonDays ? TrainingStatus.ExpiringSoon : TrainingStatus.Valid;
         return new Requirement(emp, course, status, lastCompleted, validUntil, daysLeft, validUntil);

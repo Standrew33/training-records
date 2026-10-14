@@ -23,7 +23,7 @@
         .OrderByDescending(x => x.Hit.Count).ThenBy(x => x.Employee.LastName, StringComparer.CurrentCulture)
         .ToList();
     string csvHref = CsvWriter.ToDataUri(CsvWriter.Write(
-        ["ID", "Příjmení", "Jméno", "Útvar", "Pozice", "Nadřízený", "Školení", "Stav", "Naposledy", "Platné do", "Navržený termín"],
+        ["ID", "Last name", "First name", "Department", "Position", "Manager", "Training", "Status", "Last completed", "Valid until", "Proposed term"],
         rows.SelectMany(x => x.Hit.Select(r => new string?[]
         {
             x.Employee.Id, x.Employee.LastName, x.Employee.FirstName, x.Employee.Department, x.Employee.Position, State.ManagerName(x.Employee),
@@ -33,35 +33,35 @@
 }
 
 <section class="card">
-    <h2>Lidé a jejich školení</h2>
+    <h2>People and their trainings</h2>
     <div class="filters">
-        <input type="search" placeholder="Hledat jméno, ID, pozici…" value="@f.Query" @oninput="e => f.Query = e.Value?.ToString() ?? string.Empty" />
-        <select value="@f.Department" @onchange="e => f.Department = e.Value?.ToString() ?? string.Empty" aria-label="Útvar">
-            <option value="">Všechny útvary</option>
+        <input type="search" placeholder="Search name, ID, position…" value="@f.Query" @oninput="e => f.Query = e.Value?.ToString() ?? string.Empty" />
+        <select value="@f.Department" @onchange="e => f.Department = e.Value?.ToString() ?? string.Empty" aria-label="Department">
+            <option value="">All departments</option>
             @foreach (var d in departments) { <option>@d</option> }
         </select>
-        <select value="@f.ManagerId" @onchange="e => f.ManagerId = e.Value?.ToString() ?? string.Empty" aria-label="Nadřízený">
-            <option value="">Všichni nadřízení</option>
-            @foreach (var m in managers) { <option value="@m.Id">Tým: @m.FullName</option> }
+        <select value="@f.ManagerId" @onchange="e => f.ManagerId = e.Value?.ToString() ?? string.Empty" aria-label="Manager">
+            <option value="">All managers</option>
+            @foreach (var m in managers) { <option value="@m.Id">Team: @m.FullName</option> }
         </select>
-        <select value="@f.CourseCode" @onchange="e => f.CourseCode = e.Value?.ToString() ?? string.Empty" aria-label="Školení">
-            <option value="">Všechna školení</option>
+        <select value="@f.CourseCode" @onchange="e => f.CourseCode = e.Value?.ToString() ?? string.Empty" aria-label="Training">
+            <option value="">All trainings</option>
             @foreach (var c in State.Data.Courses.Where(c => c.Audience.Kind != AudienceKind.Optional)) { <option value="@c.Code">@c.Name</option> }
         </select>
-        <select value="@f.Status" @onchange="e => f.Status = e.Value?.ToString() ?? ProblemKey" aria-label="Stav">
-            <option value="problem">Jen s problémem (vše kromě platných)</option>
-            <option value="@nameof(TrainingStatus.Expired)">Prošlé</option>
-            <option value="@nameof(TrainingStatus.Missing)">Chybí</option>
-            <option value="@nameof(TrainingStatus.ExpiringSoon)">Brzy vyprší</option>
-            <option value="@nameof(TrainingStatus.Valid)">Platné</option>
-            <option value="all">Všichni</option>
+        <select value="@f.Status" @onchange="e => f.Status = e.Value?.ToString() ?? ProblemKey" aria-label="Status">
+            <option value="problem">Problems only (everything but valid)</option>
+            <option value="@nameof(TrainingStatus.Expired)">Expired</option>
+            <option value="@nameof(TrainingStatus.Missing)">Missing</option>
+            <option value="@nameof(TrainingStatus.ExpiringSoon)">Expiring soon</option>
+            <option value="@nameof(TrainingStatus.Valid)">Valid</option>
+            <option value="all">Everybody</option>
         </select>
-        <a class="btn" download="lide-skoleni.csv" href="@csvHref">Export CSV</a>
+        <a class="btn" download="people-trainings.csv" href="@csvHref">Export CSV</a>
     </div>
-    <p class="muted">@rows.Count lidí</p>
+    <p class="muted">@rows.Count people</p>
     <div class="tablewrap">
         <table>
-            <thead><tr><th>Zaměstnanec</th><th>Útvar / pozice</th><th>Školení</th></tr></thead>
+            <thead><tr><th>Employee</th><th>Department / position</th><th>Trainings</th></tr></thead>
             <tbody>
             @foreach (var (e, all, hit) in rows)
             {
@@ -71,28 +71,28 @@
                     <td><b>@e.FullName</b> <small class="muted">@e.Id</small>
                         @if (group != EmployeeGroup.Active) { <div><span class="tag">@Format.Label(group)</span></div> }</td>
                     <td>@e.Department
-                        @if (e.DepartmentInferred) { <span class="tag" title="Útvar chyběl v datech a byl odvozen"> odvozeno</span> }
+                        @if (e.DepartmentInferred) { <span class="tag" title="The department was missing in the data and was inferred"> inferred</span> }
                         <div class="muted">@e.Position</div></td>
                     <td class="chips">
                         @foreach (var r in shown) { <Badge Status="r.Status" Text="@r.Course.Code" /> }
-                        @if (shown.Count == 0) { <span class="muted">bez povinností</span> }
+                        @if (shown.Count == 0) { <span class="muted">no obligations</span> }
                     </td>
                 </tr>
                 @if (open == e.Id)
                 {
                     <tr class="detail"><td colspan="3">
-                        <div class="muted">Nadřízený: @(e.ManagerId is null ? "neuveden / neznámý" : State.ManagerName(e)) · Nástup: @Format.Date(e.HireDate)@(e.TerminationDate is null ? "" : $" · Ukončení: {Format.Date(e.TerminationDate)}")</div>
+                        <div class="muted">Manager: @(e.ManagerId is null ? "none / unknown" : State.ManagerName(e)) · Start: @Format.Date(e.HireDate)@(e.TerminationDate is null ? "" : $" · End: {Format.Date(e.TerminationDate)}")</div>
                         <table class="inner">
-                            <thead><tr><th>Školení</th><th>Stav</th><th>Naposledy</th><th>Platí do</th><th>Navržený termín</th></tr></thead>
+                            <thead><tr><th>Training</th><th>Status</th><th>Last completed</th><th>Valid until</th><th>Proposed term</th></tr></thead>
                             <tbody>
                             @foreach (var r in all)
                             {
                                 <tr>
                                     <td>@r.Course.Name</td>
                                     <td><Badge Status="r.Status" />
-                                        @if (r.DaysLeft is { } days && r.Status != TrainingStatus.Valid) { <small class="muted"> @(days < 0 ? $"před {-days} dny" : $"za {days} dní")</small> }</td>
+                                        @if (r.DaysLeft is { } days && r.Status != TrainingStatus.Valid) { <small class="muted"> @(days < 0 ? $"{-days} days ago" : $"in {days} days")</small> }</td>
                                     <td>@Format.Date(r.LastCompleted)</td>
-                                    <td>@(r.Course.Expires ? Format.Date(r.ValidUntil) : "bez expirace")</td>
+                                    <td>@(r.Course.Expires ? Format.Date(r.ValidUntil) : "never expires")</td>
                                     <td>@(planned.TryGetValue((e.Id, r.Course.Code), out var a) ? $"{Format.Date(a.Term.Date)} ({a.Term.Id})" : "–")</td>
                                 </tr>
                             }

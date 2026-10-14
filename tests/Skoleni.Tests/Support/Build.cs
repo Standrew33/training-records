@@ -3,7 +3,7 @@ using Skoleni.Core.Models;
 
 namespace Skoleni.Tests.Support;
 
-/// <summary>Stavebnice pro testy: krátké továrny, aby test ukazoval jen to, na čem záleží.</summary>
+/// <summary>Test builders: short factories so that a test shows only what matters.</summary>
 internal static class Build
 {
     public static readonly DateOnly Today = new(2026, 10, 1);

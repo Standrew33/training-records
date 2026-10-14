@@ -5,14 +5,14 @@ using Skoleni.Data.Parsing;
 
 namespace Skoleni.Data;
 
-/// <summary>Čtyři surové exporty jako text (dekódování řeší volající, viz <see cref="TextFile"/>).</summary>
+/// <summary>The four raw exports as text (decoding is up to the caller, see <see cref="TextFile"/>).</summary>
 public sealed record RawExports(string Employees, string Completions, string Catalog, string Terms);
 
 public static class DatasetBuilder
 {
     /// <summary>
-    /// Pořadí je dané závislostmi: zaměstnanci → katalog (potřebuje kanonické útvary a pozice)
-    /// → absolvovaná (potřebuje zaměstnance a katalog) → termíny (potřebují katalog).
+    /// The order follows the dependencies: employees -> catalogue (needs canonical departments and positions)
+    /// -> completed trainings (need employees and the catalogue) -> terms (need the catalogue).
     /// </summary>
     public static Dataset Build(RawExports raw, DateOnly exportDate)
     {
@@ -31,7 +31,7 @@ public static class DatasetBuilder
 
 public static class TextFile
 {
-    /// <summary>Striktní UTF-8; když soubor UTF-8 není, windows-1250 (tak je exportováno absolvovana_skoleni.csv).</summary>
+    /// <summary>Strict UTF-8; when the file is not UTF-8, windows-1250 (that is how absolvovana_skoleni.csv is exported).</summary>
     public static string Read(string path)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);

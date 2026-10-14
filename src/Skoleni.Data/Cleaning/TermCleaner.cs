@@ -16,7 +16,7 @@ public static class TermCleaner
         {
             var id = row.Trimmed("id_terminu");
             var (code, changed) = resolver.Resolve(row["kod_skoleni"]);
-            if (changed && code is not null) log.Warn(Sources.Terms, id, $"Kód „{row["kod_skoleni"]}“ v termínu.", $"Opraveno na {code}.");
+            if (changed && code is not null) log.Warn(Sources.Terms, id, $"Course code \"{row["kod_skoleni"]}\" in the term.", $"Corrected to {code}.");
 
             var rawDate = row.Trimmed("datum");
             DateOnly? date = CzechDate.TryParse(rawDate, out var d, out _) ? d : null;
@@ -28,37 +28,37 @@ public static class TermCleaner
             var place = row.Trimmed("misto");
 
             string? excluded = null;
-            if (code is null) excluded = $"neznámý kód školení „{row["kod_skoleni"]}“";
-            else if (date is null) excluded = $"neplatné datum „{rawDate}“";
-            else if (Text.Key(row["stav"]).StartsWith("zrus")) excluded = "zrušeno";
-            else if (capacity <= 0) excluded = "nulová kapacita";
+            if (code is null) excluded = $"unknown course code \"{row["kod_skoleni"]}\"";
+            else if (date is null) excluded = $"invalid date \"{rawDate}\"";
+            else if (Text.Key(row["stav"]).StartsWith("zrus")) excluded = "cancelled";
+            else if (capacity <= 0) excluded = "zero capacity";
 
-            if (date is null) log.Error(Sources.Terms, id, $"Neplatné datum termínu „{rawDate}“.", "Termín vyřazen z plánování.");
-            if (capacity <= 0) log.Error(Sources.Terms, id, "Kapacita 0.", "Termín vyřazen z plánování.");
+            if (date is null) log.Error(Sources.Terms, id, $"Invalid term date \"{rawDate}\".", "Term excluded from planning.");
+            if (capacity <= 0) log.Error(Sources.Terms, id, "Capacity is 0.", "Term excluded from planning.");
             if (booked > capacity && capacity > 0)
-                log.Warn(Sources.Terms, id, $"Přeplněno: obsazeno {booked} z {capacity}.", "Volná kapacita = 0; ověřit, zda nejde o překlep.");
-            if (price is null) log.Warn(Sources.Terms, id, $"Cena neuvedena („{rawPrice}“).", "Pro odhad nákladů se použije medián cen téhož školení.");
-            else if (!rawPrice.All(char.IsDigit)) log.Info(Sources.Terms, id, $"Cena zapsána jako „{rawPrice}“.", $"Převedeno na {price.Value.ToString(CultureInfo.InvariantCulture)}.");
-            if (start is null && date is not null) log.Warn(Sources.Terms, id, $"Čas „{row["cas"]}“ nelze přečíst.", "Při kontrole kolizí se počítá, že zabírá celý den.");
+                log.Warn(Sources.Terms, id, $"Overbooked: {booked} booked of {capacity}.", "Free capacity = 0; check whether it is a typo.");
+            if (price is null) log.Warn(Sources.Terms, id, $"Price not stated (\"{rawPrice}\").", "The median price of the same course is used for the cost estimate.");
+            else if (!rawPrice.All(char.IsDigit)) log.Info(Sources.Terms, id, $"Price written as \"{rawPrice}\".", $"Converted to {price.Value.ToString(CultureInfo.InvariantCulture)}.");
+            if (start is null && date is not null) log.Warn(Sources.Terms, id, $"Time \"{row["cas"]}\" cannot be read.", "For collision checks it is assumed to take the whole day.");
 
             if (excluded is null && code is not null && date is not null)
             {
                 var key = $"{code}|{date:o}|{row.Trimmed("cas")}|{place}";
                 if (seen.TryGetValue(key, out var original))
                 {
-                    excluded = $"duplicita termínu {original}";
-                    log.Error(Sources.Terms, id, $"Duplicita termínu {original} (stejné školení, den, čas i místo).", "Vyřazen, aby se kapacita nepočítala dvakrát.");
+                    excluded = $"duplicate of term {original}";
+                    log.Error(Sources.Terms, id, $"Duplicate of term {original} (same course, day, time and place).", "Excluded so the capacity is not counted twice.");
                 }
                 else seen[key] = id;
             }
 
             var weekend = date is { DayOfWeek: DayOfWeek.Saturday or DayOfWeek.Sunday };
-            if (weekend) log.Warn(Sources.Terms, id, $"Termín {date:yyyy-MM-dd} připadá na víkend.", "Ponechán, v plánu označen; ověřit se školitelem.");
+            if (weekend) log.Warn(Sources.Terms, id, $"Term {date:yyyy-MM-dd} falls on a weekend.", "Kept and flagged in the plan; confirm with the trainer.");
 
             drafts.Add(new Term(id, code ?? row.Trimmed("kod_skoleni"), date, start, end, place, capacity, booked, price, false, excluded, weekend));
         }
 
-        // Chybějící cena: medián cen použitelných termínů téhož školení, vždy označeno jako odhad.
+        // Missing price: median price of the usable terms of the same course, always marked as an estimate.
         var medians = drafts.Where(t => t.Price is not null && t.ExcludedReason is null)
             .GroupBy(t => t.CourseCode)
             .ToDictionary(g => g.Key, g => Median(g.Select(t => t.Price!.Value)));

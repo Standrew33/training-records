@@ -3,8 +3,8 @@ using Skoleni.Core.Models;
 namespace Skoleni.Data.Cleaning;
 
 /// <summary>
-/// Sběrač vad vstupních dat. Pravidlo celého čištění: nic se neopravuje ani nevyřazuje mlčky –
-/// každá úprava má záznam „co bylo špatně“ a „co se s tím stalo“.
+/// Collector of input-data defects. The rule of the whole cleaning step: nothing is silently corrected or dropped -
+/// every change has a record of "what was wrong" and "what was done about it".
 /// </summary>
 public sealed class IssueLog
 {
@@ -22,8 +22,8 @@ public sealed class IssueLog
 
 public static class Sources
 {
-    public const string Employees = "zaměstnanci";
-    public const string Completions = "absolvovaná školení";
-    public const string Catalog = "katalog";
-    public const string Terms = "termíny";
+    public const string Employees = "employees";
+    public const string Completions = "completed trainings";
+    public const string Catalog = "catalogue";
+    public const string Terms = "terms";
 }

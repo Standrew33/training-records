@@ -12,7 +12,7 @@ public class ComplianceTests
     public void Validity_is_inclusive_on_the_last_day()
     {
         var lastDay = Compliance.Evaluate(Emp("E1"), Kyber, Today.AddMonths(-12), Today, soonDays: 0);
-        Assert.Equal(TrainingStatus.ExpiringSoon, lastDay.Status); // platí ještě dnes (0 dní zbývá), ne „prošlé“
+        Assert.Equal(TrainingStatus.ExpiringSoon, lastDay.Status); // still valid today (0 days left), not "expired"
         Assert.Equal(0, lastDay.DaysLeft);
         var dayAfter = Compliance.Evaluate(Emp("E1"), Kyber, Today.AddMonths(-12).AddDays(-1), Today, soonDays: 0);
         Assert.Equal(TrainingStatus.Expired, dayAfter.Status);
@@ -34,7 +34,7 @@ public class ComplianceTests
     [Fact]
     public void Month_end_is_clamped_not_overflowed()
     {
-        // 29. 2. 2024 + 12 měsíců = 28. 2. 2025, ne 1. 3. 2025
+        // 29 Feb 2024 + 12 months = 28 Feb 2025, not 1 Mar 2025
         var r = Compliance.Evaluate(Emp("E1"), Kyber, new DateOnly(2024, 2, 29), new DateOnly(2025, 1, 1), 30);
         Assert.Equal(new DateOnly(2025, 2, 28), r.ValidUntil);
     }
@@ -82,7 +82,7 @@ public class ComplianceTests
         var emps = new[] { Emp("E1", "Laboratoře", "Technik"), Emp("E2", "Správa budov", "Technik údržby") };
         var reqs = Compliance.Compute(Set(emps, courses), Today, 30);
         Assert.Equal(["ALL", "LAB"], reqs.Where(r => r.Employee.Id == "E1").Select(r => r.Course.Code).Order());
-        Assert.Equal(["ALL", "TECH"], reqs.Where(r => r.Employee.Id == "E2").Select(r => r.Course.Code).Order()); // „Technik“ ≠ „Technik údržby“
+        Assert.Equal(["ALL", "TECH"], reqs.Where(r => r.Employee.Id == "E2").Select(r => r.Course.Code).Order()); // "Technik" is not "Technik údržby"
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class ComplianceTests
     {
         var emps = new[]
         {
-            Emp("E1", state: EmployeeState.Terminated), Emp("E2", end: Today), // ukončení dnes = už nepracuje
+            Emp("E1", state: EmployeeState.Terminated), Emp("E2", end: Today), // terminated today = no longer working
             Emp("E3", end: Today.AddDays(1)), Emp("E4", state: EmployeeState.ParentalLeave), Emp("E5", hire: Today.AddDays(3)),
         };
         var reqs = Compliance.Compute(Set(emps, [Kyber]), Today, 30);

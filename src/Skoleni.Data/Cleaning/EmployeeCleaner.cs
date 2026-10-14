@@ -21,7 +21,7 @@ public static partial class EmployeeCleaner
             if (aliases.ContainsKey(id)) continue;
             if (!seenIds.Add(id))
             {
-                log.Error(Sources.Employees, id, $"ID zaměstnance se v souboru opakuje (řádek {row.Line}).", "Druhý výskyt vynechán.");
+                log.Error(Sources.Employees, id, $"Employee ID repeats in the file (line {row.Line}).", "Second occurrence skipped.");
                 continue;
             }
             drafts.Add(ToDraft(row, id, departments, exportDate, log));
@@ -31,7 +31,7 @@ public static partial class EmployeeCleaner
         foreach (var d in drafts.Where(d => d.ManagerEmail.Length > 0))
         {
             if (byEmail.TryGetValue(d.ManagerEmail, out var managerId) && managerId != d.Id) d.ManagerId = managerId;
-            else log.Warn(Sources.Employees, d.Id, $"Nadřízený „{d.ManagerEmail}“ v evidenci neexistuje.", "Zaměstnanec zůstane bez nadřízeného (je vidět jen v celkových přehledech).");
+            else log.Warn(Sources.Employees, d.Id, $"Manager \"{d.ManagerEmail}\" does not exist in the register.", "Employee is left without a manager (visible only in overall views).");
         }
         InferMissingDepartments(drafts, log);
 
@@ -40,8 +40,8 @@ public static partial class EmployeeCleaner
     }
 
     /// <summary>
-    /// Duplicitní osoba = shodné rodné číslo pod různým ID (v datech: překlepy ve jménu, e-mail s „2“).
-    /// Rodné číslo se čte jen tady, jen pro tuto shodu, a nikam se neukládá. Zachová se nejnižší ID.
+    /// A duplicate person = the same national identification number under a different ID (in the data: typos in the name,
+    /// an e-mail with a "2"). The number is read only here, only for this match, and is never stored. The lowest ID is kept.
     /// </summary>
     private static Dictionary<string, string> FindDuplicates(IReadOnlyList<CsvRow> rows, IssueLog log)
     {
@@ -53,13 +53,13 @@ public static partial class EmployeeCleaner
             foreach (var dup in ids.Skip(1))
             {
                 aliases[dup] = ids[0];
-                log.Error(Sources.Employees, dup, $"Duplicitní osoba: shodné identifikační číslo osoby jako {ids[0]} (jiné ID, jméno s překlepem).", $"Sloučeno do {ids[0]}; záznamy školení se přesměrují.");
+                log.Error(Sources.Employees, dup, $"Duplicate person: same personal identification number as {ids[0]} (different ID, name with typos).", $"Merged into {ids[0]}; training records are redirected.");
             }
         }
         return aliases;
     }
 
-    /// <summary>Normalizovaný klíč → nejčastější zápis. Zkrácený název („Studijní“) se přiřadí jedinému delšímu, který jím začíná.</summary>
+    /// <summary>Normalised key -> most frequent spelling. A shortened name ("Studijní") maps to the single longer one that starts with it ("Studijní oddělení").</summary>
     private static Dictionary<string, string> BuildDepartmentMap(IReadOnlyList<CsvRow> rows)
     {
         var map = rows.Select(r => r.Trimmed("utvar")).Where(s => s.Length > 0)
@@ -78,42 +78,42 @@ public static partial class EmployeeCleaner
         var rawEmail = row.Trimmed("email");
         var email = Regex.Replace(rawEmail, @"\s+", "").ToLowerInvariant();
         if (!EmailPattern().IsMatch(email))
-            log.Warn(Sources.Employees, id, $"Neplatný e-mail „{rawEmail}“.", "Ponechán beze změny, k párování se nepoužívá.");
+            log.Warn(Sources.Employees, id, $"Invalid e-mail \"{rawEmail}\".", "Kept unchanged; not used for matching.");
         else if (email != rawEmail)
-            log.Info(Sources.Employees, id, $"E-mail „{rawEmail}“ obsahuje mezeru.", "Mezery odstraněny.");
+            log.Info(Sources.Employees, id, $"E-mail \"{rawEmail}\" contains whitespace.", "Whitespace removed.");
 
         var first = Text.TitleCase(row["jmeno"]);
         var last = Text.TitleCase(row["prijmeni"]);
         if (first != row["jmeno"] || last != row["prijmeni"])
-            log.Info(Sources.Employees, id, $"Jméno „{row["jmeno"]}“ / „{row["prijmeni"]}“ s nekonzistentní velikostí písmen nebo mezerami.", "Normalizováno.");
+            log.Info(Sources.Employees, id, $"Name \"{row["jmeno"]}\" / \"{row["prijmeni"]}\" has inconsistent letter case or whitespace.", "Normalised.");
 
         var hireRaw = row.Trimmed("datum_nastupu");
         DateOnly? hire = null;
         if (CzechDate.TryParse(hireRaw, out var h, out var kind))
         {
             hire = h;
-            if (kind != CzechDate.Kind.Iso) log.Info(Sources.Employees, id, $"Datum nástupu v jiném formátu („{hireRaw}“).", $"Převedeno na {h:yyyy-MM-dd}.");
+            if (kind != CzechDate.Kind.Iso) log.Info(Sources.Employees, id, $"Hire date in a different format (\"{hireRaw}\").", $"Converted to {h:yyyy-MM-dd}.");
         }
-        else log.Warn(Sources.Employees, id, $"Datum nástupu „{hireRaw}“ nelze přečíst.", "Nástup neznámý.");
+        else log.Warn(Sources.Employees, id, $"Hire date \"{hireRaw}\" cannot be read.", "Hire date unknown.");
         var end = CzechDate.ParseOrNull(row["datum_ukonceni"]);
 
         var stateKey = Text.Key(row["stav"]);
         var state = stateKey.StartsWith("ukon") ? EmployeeState.Terminated : stateKey.StartsWith("rodic") ? EmployeeState.ParentalLeave : EmployeeState.Active;
         if (stateKey is not ("aktivni" or "") && state == EmployeeState.Active)
-            log.Warn(Sources.Employees, id, $"Neznámý stav „{row["stav"]}“.", "Bráno jako aktivní.");
+            log.Warn(Sources.Employees, id, $"Unknown status \"{row["stav"]}\".", "Treated as active.");
         if (hire > exportDate)
-            log.Info(Sources.Employees, id, $"Nástup až {hire:yyyy-MM-dd} (po exportu).", "Označen jako nastupující; školení se plánují před nástupem.");
+            log.Info(Sources.Employees, id, $"Starts only on {hire:yyyy-MM-dd} (after the export).", "Marked as starting; trainings are planned before the start.");
         if (state == EmployeeState.Active && end > exportDate)
-            log.Info(Sources.Employees, id, $"Aktivní, ale s plánovaným ukončením {end:yyyy-MM-dd}.", "Plánovač ho nepřihlásí na termín po tomto datu.");
+            log.Info(Sources.Employees, id, $"Active, but with a planned termination on {end:yyyy-MM-dd}.", "The planner will not book a term after this date.");
         if (state == EmployeeState.Terminated && end is null)
-            log.Warn(Sources.Employees, id, "Ukončený zaměstnanec bez data ukončení.", "Do statistik se nezapočítává.");
+            log.Warn(Sources.Employees, id, "Terminated employee without a termination date.", "Not counted in statistics.");
 
         var rawDept = row.Trimmed("utvar");
         var dept = "";
         if (rawDept.Length > 0)
         {
             dept = departments[Text.Key(rawDept)];
-            if (dept != rawDept) log.Info(Sources.Employees, id, $"Útvar „{rawDept}“ zapsán jinak než jinde.", $"Sjednoceno na „{dept}“.");
+            if (dept != rawDept) log.Info(Sources.Employees, id, $"Department \"{rawDept}\" is spelled differently elsewhere.", $"Unified to \"{dept}\".");
         }
 
         return new Draft
@@ -123,7 +123,7 @@ public static partial class EmployeeCleaner
         };
     }
 
-    /// <summary>Chybějící útvar: z většiny podřízených (vedoucí), jinak z útvaru nadřízeného. Vždy s varováním k ověření.</summary>
+    /// <summary>Missing department: from the majority of subordinates (a manager), otherwise from the manager's department. Always with a warning to verify.</summary>
     private static void InferMissingDepartments(List<Draft> drafts, IssueLog log)
     {
         foreach (var d in drafts.Where(d => d.Department.Length == 0))
@@ -132,11 +132,11 @@ public static partial class EmployeeCleaner
                 .GroupBy(x => x.Department).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
             var fromManager = drafts.FirstOrDefault(x => x.Id == d.ManagerId)?.Department;
             var inferred = fromSubordinates ?? (string.IsNullOrEmpty(fromManager) ? null : fromManager);
-            d.Department = inferred ?? "Neuvedeno";
+            d.Department = inferred ?? "Unknown";
             d.DepartmentInferred = true;
-            log.Warn(Sources.Employees, d.Id, "Chybí útvar.", inferred is null
-                ? "Nelze odvodit, vedeno jako „Neuvedeno“."
-                : $"Odvozeno „{inferred}“ ({(fromSubordinates is not null ? "z podřízených" : "z nadřízeného")}); ověřit.");
+            log.Warn(Sources.Employees, d.Id, "Department is missing.", inferred is null
+                ? "Cannot be inferred, recorded as \"Unknown\"."
+                : $"Inferred \"{inferred}\" ({(fromSubordinates is not null ? "from subordinates" : "from the manager")}); please verify.");
         }
     }
 

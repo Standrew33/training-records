@@ -7,32 +7,32 @@
 }
 else if (!State.Loaded)
 {
-    <p class="msg">Načítám data…</p>
+    <p class="msg">Loading data…</p>
 }
 else
 {
     <header class="top">
         <div class="top-in">
-            <h1>Evidence školení</h1>
+            <h1>Training records</h1>
             <div class="controls">
-                <label>Stav k datu
+                <label>As of date
                     <input type="date" value="@State.AsOf.ToString("yyyy-MM-dd")" @onchange="OnDate" />
                 </label>
-                <label>„Brzy vyprší“ = do
+                <label>"Expiring soon" = within
                     <select value="@State.SoonDays" @onchange="OnSoon">
                         @foreach (var n in new[] { 30, 60, 90, 180 })
                         {
-                            <option value="@n">@n dní</option>
+                            <option value="@n">@n days</option>
                         }
                     </select>
                 </label>
                 @if (State.AsOf != State.Data.ExportDate)
                 {
-                    <button class="link" @onclick="() => State.SetAsOf(State.Data.ExportDate)">zpět na datum exportu</button>
+                    <button class="link" @onclick="() => State.SetAsOf(State.Data.ExportDate)">back to the export date</button>
                 }
             </div>
         </div>
-        <nav class="tabs" aria-label="Sekce">
+        <nav class="tabs" aria-label="Sections">
             @foreach (var (tab, label) in Tabs)
             {
                 <button class="@(State.Tab == tab ? "on" : "")" aria-current="@(State.Tab == tab ? "page" : null)" @onclick="() => State.Go(tab)">@label</button>
@@ -49,13 +49,13 @@ else
             case Tab.Quality: <QualityView /> break;
         }
     </main>
-    <footer>Fiktivní data, export z @Format.Date(State.Data.ExportDate). Rodná čísla ani volné poznámky z exportů se do aplikace nepřenášejí.</footer>
+    <footer>Fictitious data, exported on @Format.Date(State.Data.ExportDate). National ID numbers and free-text notes from the exports are not carried into the app.</footer>
 }
 
 @code {
     private static readonly (Tab, string)[] Tabs =
     [
-        (Tab.Overview, "Přehled"), (Tab.People, "Lidé"), (Tab.Plan, "Plán přihlášení"), (Tab.Terms, "Termíny"), (Tab.Quality, "Kvalita dat"),
+        (Tab.Overview, "Overview"), (Tab.People, "People"), (Tab.Plan, "Sign-up plan"), (Tab.Terms, "Terms"), (Tab.Quality, "Data quality"),
     ];
 
     protected override async Task OnInitializedAsync()

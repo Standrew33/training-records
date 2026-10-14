@@ -5,7 +5,7 @@ using Skoleni.Data.Parsing;
 
 namespace Skoleni.Tests;
 
-/// <summary>Každý druh vady z reálných exportů má tady malou ukázku a test, že se s ním naloží vždy stejně a nahlas.</summary>
+/// <summary>Every kind of defect found in the real exports has a small sample here and a test that it is always handled the same way, and out loud.</summary>
 public class CleaningTests
 {
     private static readonly DateOnly Export = new(2026, 10, 1);
@@ -23,7 +23,7 @@ public class CleaningTests
 
     private static IEnumerable<Issue> IssuesAbout(Dataset ds, string reference) => ds.Issues.Where(i => i.Ref.StartsWith(reference));
 
-    // ---------- zaměstnanci ----------
+    // ---------- employees ----------
 
     [Fact]
     public void Merges_duplicate_person_by_identity_number_and_redirects_their_records()
@@ -70,10 +70,10 @@ public class CleaningTests
             "E4,C,C,c@x.example,,Laborant,sef@x.example,2010-01-01,,aktivní,4,\n" +
             "E5,V,V,ved@x.example,Vedení,Vedoucí,,2010-01-01,,aktivní,5,\n");
         var boss = ds.Employees.Single(e => e.Id == "E1");
-        Assert.Equal("Laboratoře", boss.Department);   // z podřízených, ne z nadřízeného (Vedení)
+        Assert.Equal("Laboratoře", boss.Department);   // from subordinates, not from the manager (Vedení)
         Assert.True(boss.DepartmentInferred);
-        Assert.Equal("Laboratoře", ds.Employees.Single(e => e.Id == "E4").Department); // z nadřízeného
-        Assert.Equal(2, ds.Issues.Count(i => i.Severity == IssueSeverity.Warning && i.Description == "Chybí útvar."));
+        Assert.Equal("Laboratoře", ds.Employees.Single(e => e.Id == "E4").Department); // from the manager
+        Assert.Equal(2, ds.Issues.Count(i => i.Severity == IssueSeverity.Warning && i.Description == "Department is missing."));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class CleaningTests
     {
         var ds = Build(employees: "E1,A,A,a@x.example,IT,Technik,nikdo@x.example,2010-01-01,,aktivní,1,\n");
         Assert.Null(ds.Employees.Single().ManagerId);
-        Assert.Contains(ds.Issues, i => i.Ref == "E1" && i.Description.Contains("Nadřízený"));
+        Assert.Contains(ds.Issues, i => i.Ref == "E1" && i.Description.Contains("Manager"));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class CleaningTests
         Assert.True(lab.Audience.Applies(ds.Employees.Single()));
     }
 
-    // ---------- absolvovaná školení ----------
+    // ---------- completed trainings ----------
 
     private const string OneEmployee = "E1,A,A,a@x.example,IT,Technik,,2010-01-01,,aktivní,1,\n";
 
@@ -169,7 +169,7 @@ public class CleaningTests
     {
         var ds = Build(OneEmployee, completions: $"Z1;E1;A;{written};2025-01-01;;X;0,00;\n");
         Assert.Empty(ds.Completions);
-        Assert.Contains(ds.Issues, i => i.Severity == IssueSeverity.Error && i.Description.Contains("Neznámý kód"));
+        Assert.Contains(ds.Issues, i => i.Severity == IssueSeverity.Error && i.Description.Contains("Unknown course code"));
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public class CleaningTests
     {
         var ds = Build(OneEmployee, completions: "Z1;E9001;Neznámý;KYBER;2025-01-01;;X;0,00;\n");
         Assert.Empty(ds.Completions);
-        Assert.Contains(ds.Issues, i => i.Description.Contains("neexistujícího zaměstnance"));
+        Assert.Contains(ds.Issues, i => i.Description.Contains("non-existent employee"));
     }
 
     [Fact]
@@ -199,7 +199,7 @@ public class CleaningTests
     {
         var ds = Build(OneEmployee, completions: "Z1;E1;A;KYBER;2026-11-25;;X;0,00;zadáno předem\n");
         Assert.Empty(ds.Completions);
-        Assert.Contains(ds.Issues, i => i.Severity == IssueSeverity.Warning && i.Description.Contains("po exportu"));
+        Assert.Contains(ds.Issues, i => i.Severity == IssueSeverity.Warning && i.Description.Contains("after the export"));
     }
 
     [Fact]
@@ -223,10 +223,10 @@ public class CleaningTests
     {
         var ds = Build("E1,A,A,a@x.example,IT,T,,2024-01-01,,aktivní,1,\n", completions: "Z1;E1;A;KYBER;2022-01-16;;X;-600,00;\n");
         Assert.Null(ds.Completions.Single().Price);
-        Assert.Contains(ds.Issues, i => i.Description.Contains("před nástupem"));
+        Assert.Contains(ds.Issues, i => i.Description.Contains("before"));
     }
 
-    // ---------- termíny ----------
+    // ---------- terms ----------
 
     [Fact]
     public void Invalid_duplicate_cancelled_and_zero_capacity_terms_are_excluded_with_reason()
@@ -239,10 +239,10 @@ public class CleaningTests
             "T5;KYBER;2026-12-03;09:00-12:00;Aula A;0;0;800;plánováno\n" +
             "T6;KYBER;2026-12-09;09:00-12:00;Aula A;30;0;800;plánováno\n");
         Assert.Equal(["T6", "T1"], ds.Terms.Where(t => t.Usable).Select(t => t.Id).Reverse());
-        Assert.Contains("duplicita", ds.Terms.Single(t => t.Id == "T2").ExcludedReason);
-        Assert.Contains("datum", ds.Terms.Single(t => t.Id == "T3").ExcludedReason);
-        Assert.Equal("zrušeno", ds.Terms.Single(t => t.Id == "T4").ExcludedReason);
-        Assert.Equal("nulová kapacita", ds.Terms.Single(t => t.Id == "T5").ExcludedReason);
+        Assert.Contains("duplicate", ds.Terms.Single(t => t.Id == "T2").ExcludedReason);
+        Assert.Contains("date", ds.Terms.Single(t => t.Id == "T3").ExcludedReason);
+        Assert.Equal("cancelled", ds.Terms.Single(t => t.Id == "T4").ExcludedReason);
+        Assert.Equal("zero capacity", ds.Terms.Single(t => t.Id == "T5").ExcludedReason);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class CleaningTests
     {
         var ds = Build(terms: "T1;KYBER;2026-11-04;08:00-11:00;Aula A;30;31;450;plánováno\n");
         Assert.Equal(0, ds.Terms.Single().FreeSeats);
-        Assert.Contains(ds.Issues, i => i.Description.Contains("Přeplněno"));
+        Assert.Contains(ds.Issues, i => i.Description.Contains("Overbooked"));
     }
 
     [Fact]
@@ -280,10 +280,10 @@ public class CleaningTests
     {
         var ds = Build(terms: "T1;KYBER;2026-11-14;09:00-12:00;Online;60;0;800;plánováno\n");
         Assert.True(ds.Terms.Single().Weekend);
-        Assert.Contains(ds.Issues, i => i.Description.Contains("víkend"));
+        Assert.Contains(ds.Issues, i => i.Description.Contains("weekend"));
     }
 
-    // ---------- soukromí ----------
+    // ---------- privacy ----------
 
     [Fact]
     public void Published_json_contains_no_identity_numbers_and_survives_a_round_trip()
