@@ -30,9 +30,12 @@ public static class Compliance
 
     public static EmployeeGroup GroupOf(Employee e, DateOnly asOf)
     {
-        if (e.State == EmployeeState.Terminated || (e.TerminationDate is { } end && end <= asOf)) return EmployeeGroup.Terminated;
-        if (e.State == EmployeeState.ParentalLeave) return EmployeeGroup.ParentalLeave;
-        if (e.HireDate is { } hire && hire > asOf) return EmployeeGroup.Starting;
+        if (e.State == EmployeeState.Terminated || (e.TerminationDate is { } end && end <= asOf)) 
+            return EmployeeGroup.Terminated;
+        if (e.State == EmployeeState.ParentalLeave) 
+            return EmployeeGroup.ParentalLeave;
+        if (e.HireDate is { } hire && hire > asOf) 
+            return EmployeeGroup.Starting;
         return EmployeeGroup.Active;
     }
 
@@ -64,14 +67,17 @@ public static class Compliance
             // Never completed: deadline = start date + grace period, but no earlier than today (it is already late).
             var due = (emp.HireDate ?? asOf).AddDays(hireGraceDays);
             var deadline = emp.HireDate is not null && due > asOf ? due : asOf;
+
             return new Requirement(emp, course, TrainingStatus.Missing, null, null, null, deadline);
         }
+
         if (!course.Expires)
             return new Requirement(emp, course, TrainingStatus.Valid, lastCompleted, null, null, null);
 
         var validUntil = lastCompleted.Value.AddMonths(course.ValidityMonths!.Value); // DateOnly clamps to the end of the month
         var daysLeft = validUntil.DayNumber - asOf.DayNumber;
         var status = daysLeft < 0 ? TrainingStatus.Expired : daysLeft <= soonDays ? TrainingStatus.ExpiringSoon : TrainingStatus.Valid;
+
         return new Requirement(emp, course, status, lastCompleted, validUntil, daysLeft, validUntil);
     }
 }

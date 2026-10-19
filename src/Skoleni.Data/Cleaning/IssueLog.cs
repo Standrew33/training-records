@@ -12,9 +12,12 @@ public sealed class IssueLog
 
     public IReadOnlyList<Issue> Items => issues;
 
-    public void Info(string source, string reference, string description, string resolution) => Add(source, IssueSeverity.Info, reference, description, resolution);
-    public void Warn(string source, string reference, string description, string resolution) => Add(source, IssueSeverity.Warning, reference, description, resolution);
-    public void Error(string source, string reference, string description, string resolution) => Add(source, IssueSeverity.Error, reference, description, resolution);
+    public void Info(string source, string reference, string description, string resolution) 
+        => Add(source, IssueSeverity.Info, reference, description, resolution);
+    public void Warn(string source, string reference, string description, string resolution) 
+        => Add(source, IssueSeverity.Warning, reference, description, resolution);
+    public void Error(string source, string reference, string description, string resolution) 
+        => Add(source, IssueSeverity.Error, reference, description, resolution);
 
     private void Add(string source, IssueSeverity severity, string reference, string description, string resolution) =>
         issues.Add(new Issue(source, severity, reference, description, resolution));

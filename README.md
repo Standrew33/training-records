@@ -2,7 +2,7 @@
 
 A web application over four exports (employees, completed trainings, catalogue, terms): who is trained how well, whose validity is ending, what to resolve, and whom to sign up for which term given limited capacity.
 
-Assignment texts: [REPORT.md](REPORT.md) (what, why, assumptions, what is missing) · [AI_LOG.md](AI_LOG.md) (AI usage).
+Assignment texts: [REPORT.md](REPORT.md) (what, why, assumptions, what is missing) · [AI_USAGE.md](AI_USAGE.md) (use of AI).
 
 ## Architecture
 

@@ -1,15 +1,12 @@
 using Skoleni.Core.Models;
 using Skoleni.Data;
 
-// Usage: dotnet run --project src/Skoleni.DataPrep -- [folder-with-CSV] [output-json] [export-date]
-// Defaults: data-raw/  ->  src/Skoleni.Web/wwwroot/data/dataset.json, export date 2026-10-01.
-// The raw data contains national ID numbers; they never reach the output (see EmployeeCleaner and the Employee model).
-
 var inputDir = args.ElementAtOrDefault(0) ?? "data-raw";
 var output = args.ElementAtOrDefault(1) ?? Path.Combine("src", "Skoleni.Web", "wwwroot", "data", "dataset.json");
 var exportDate = DateOnly.Parse(args.ElementAtOrDefault(2) ?? "2026-10-01");
 
 string[] required = ["zamestnanci.csv", "absolvovana_skoleni.csv", "katalog_skoleni.csv", "terminy_skoleni.csv"];
+
 var missing = required.Where(f => !File.Exists(Path.Combine(inputDir, f))).ToList();
 if (missing.Count > 0)
 {

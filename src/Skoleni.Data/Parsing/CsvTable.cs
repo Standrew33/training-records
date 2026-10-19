@@ -31,10 +31,13 @@ public static class CsvTable
         var rows = new List<CsvRow>();
         foreach (var (line, fields) in records.Skip(1))
         {
-            if (fields.All(string.IsNullOrWhiteSpace)) continue;
+            if (fields.All(string.IsNullOrWhiteSpace)) 
+                continue;
+
             var dict = new Dictionary<string, string>();
             for (var i = 0; i < header.Length; i++)
                 dict[header[i]] = i < fields.Count ? fields[i] : "";
+
             rows.Add(new CsvRow(line, dict));
         }
         return rows;

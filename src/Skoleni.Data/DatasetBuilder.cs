@@ -25,6 +25,7 @@ public static class DatasetBuilder
             log);
         var completions = CompletionCleaner.Clean(CsvTable.Parse(raw.Completions), employees.Employees, employees.IdAliases, courses, exportDate, log);
         var terms = TermCleaner.Clean(CsvTable.Parse(raw.Terms), courses, log);
+
         return new Dataset(exportDate, employees.Employees, courses, completions, terms, log.Items);
     }
 }
